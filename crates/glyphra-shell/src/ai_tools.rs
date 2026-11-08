@@ -28,6 +28,7 @@ const GROUPS: [Group; 3] = [
         soon: None,
         tools: &[
             Tool { id: "md.draft", icon: "sparkles" },
+            Tool { id: "md.slides", icon: "monitor" },
             Tool { id: "md.improve", icon: "tools" },
             Tool { id: "md.proofread", icon: "tools" },
             Tool { id: "md.summarize", icon: "chat" },
@@ -40,7 +41,13 @@ const GROUPS: [Group; 3] = [
     Group {
         id: "pdf",
         soon: Some("0.7.0"),
-        tools: &[Tool { id: "pdf.summarize", icon: "chat" }, Tool { id: "pdf.ask", icon: "chat" }, Tool { id: "pdf.tables", icon: "apps" }],
+        tools: &[
+            Tool { id: "pdf.draft", icon: "sparkles" },
+            Tool { id: "pdf.slides", icon: "monitor" },
+            Tool { id: "pdf.summarize", icon: "chat" },
+            Tool { id: "pdf.ask", icon: "chat" },
+            Tool { id: "pdf.tables", icon: "apps" },
+        ],
     },
     Group {
         id: "drawing",

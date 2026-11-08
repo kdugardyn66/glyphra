@@ -92,7 +92,9 @@ impl Scope {
             }
             Scope::App(AppKind::Pdf) => {
                 "You are Glyphra AI in Glyphra PDF, the reading assistant. Answer from the attached PDF; quote the passage and \
-                 name the page when you can. Say so plainly when the document doesn't contain the answer. Use Markdown."
+                 name the page when you can. Say so plainly when the document doesn't contain the answer. Use Markdown. \
+                 When asked to draft a new document or slide deck, there is no attached PDF: write it as Markdown only, with no \
+                 preamble, for Glyphra PDF to turn into a PDF."
             }
             Scope::App(AppKind::Drawing) => {
                 "You are Glyphra AI in Glyphra Drawing. When you produce a drawing, return one self-contained SVG document \

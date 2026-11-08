@@ -62,7 +62,25 @@ const DRAW: Scope = Scope::App(AppKind::Drawing);
 use TaskOutput::{Answer, Content};
 
 pub static TASKS: &[Task] = &[
-    t("md.draft", MD, "Draft a Markdown file", "Write a Markdown document about the following.", Content, true),
+    t(
+        "md.draft",
+        MD,
+        "Draft a document",
+        "Write a first draft of a document about the following, as Markdown: a title, clear headings and well-structured paragraphs. Write in the language of the request.",
+        Content,
+        true,
+    ),
+    t(
+        "md.slides",
+        MD,
+        "Draft a slide deck",
+        "Write a first draft of a slide deck about the following, as Markdown. Start with a title slide (a # heading and a subtitle). \
+         Give every other slide a ## heading and at most five short bullet points. Put a line with only --- between slides. \
+         End with a closing slide. Add speaker notes for a slide as an HTML comment <!-- ... --> below its bullets. \
+         Write in the language of the request.",
+        Content,
+        true,
+    ),
     t(
         "md.improve",
         MD,
@@ -84,6 +102,25 @@ pub static TASKS: &[Task] = &[
     t("md.outline", MD, "Generate outline", "Write a hierarchical outline (headings and bullets) of this text.", Content, false),
     t("md.tidy", MD, "Tidy Markdown", "Clean up this Markdown: consistent headings, lists and tables. Keep the content.", Content, false),
     t("md.toc", MD, "Table of contents", "Write a linked table of contents for this Markdown.", Content, false),
+    t(
+        "pdf.draft",
+        PDF,
+        "Draft a PDF document",
+        "Write a first draft of a document about the following, as Markdown that will be turned into a PDF: a title, clear headings \
+         and well-structured paragraphs. Put a line with only --- where a new page must start. Write in the language of the request.",
+        Content,
+        true,
+    ),
+    t(
+        "pdf.slides",
+        PDF,
+        "Draft a PDF slide deck",
+        "Write a first draft of a slide deck about the following, as Markdown that will be turned into a PDF with one slide per page. \
+         Start with a title slide (a # heading and a subtitle). Give every other slide a ## heading and at most five short bullet points. \
+         Put a line with only --- between slides. End with a closing slide. Write in the language of the request.",
+        Content,
+        true,
+    ),
     t(
         "pdf.summarize",
         PDF,
@@ -133,7 +170,12 @@ mod tests {
         for k in AppKind::ALL {
             let ts = tasks_for(Scope::App(k));
             assert!(ts.len() >= 2, "{}", k.name());
-            assert_eq!(ts.iter().filter(|t| t.creates).count(), if k == AppKind::Pdf { 0 } else { 1 }, "{}", k.name());
+            let creates = match k {
+                AppKind::Markdown => 2,
+                AppKind::Pdf => 2,
+                AppKind::Drawing => 1,
+            };
+            assert_eq!(ts.iter().filter(|t| t.creates).count(), creates, "{}", k.name());
         }
         let mut ids: Vec<_> = TASKS.iter().map(|t| t.id).collect();
         ids.sort_unstable();
@@ -148,6 +190,14 @@ mod tests {
         assert!(r.messages[0].text().ends_with("A flow chart"));
         let r = task("md.translate").unwrap().request_with("Into French.", "Hello");
         assert!(r.messages[0].text().contains("Keep the Markdown structure. Into French.\n\n<selection>"));
+        let r = task("md.slides").unwrap().request("Our new bakery");
+        let text = r.messages[0].text();
+        assert!(text.contains("slide deck") && text.contains("---") && text.ends_with("Our new bakery"));
+        assert!(!text.contains("<selection>"), "a slide deck is created, not made from a selection");
+        let r = task("pdf.slides").unwrap().request("Our new bakery");
+        assert_eq!(r.scope, Scope::App(AppKind::Pdf));
+        let text = r.messages[0].text();
+        assert!(text.contains("one slide per page") && text.ends_with("Our new bakery") && !text.contains("<selection>"));
         let r = task("md.improve").unwrap().request("Some text");
         assert!(r.messages[0].text().contains("<selection>\nSome text\n</selection>"));
     }

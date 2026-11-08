@@ -131,6 +131,13 @@ fn exec(mut model: Signal<AppModel>, effect: Effect) {
             });
         }
         Effect::OpenInWindow(path) => open_window(path),
+        Effect::AiAttachDialog => {
+            spawn(async move {
+                if let Some(f) = rfd::AsyncFileDialog::new().pick_file().await {
+                    model.write().ai_attached(f.path());
+                }
+            });
+        }
         Effect::FocusMainWindow => dioxus::desktop::window().window.set_focus(),
         Effect::FocusSearch => {
             document::eval("setTimeout(() => document.getElementById('search')?.focus(), 30)");
@@ -293,6 +300,16 @@ pub fn Root() -> Element {
             let alive = alive_windows();
             if model.peek().open_windows != alive {
                 model.write().open_windows = alive;
+            }
+        }
+    });
+
+    // News from a running AI chat or tool reaches the screen while a request is busy.
+    use_future(move || async move {
+        loop {
+            tokio::time::sleep(Duration::from_millis(60)).await;
+            if model.peek().ai.busy() {
+                model.write().ai.pump();
             }
         }
     });

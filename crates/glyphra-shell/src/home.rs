@@ -30,6 +30,8 @@ pub fn HomeTab() -> Element {
                     Page::Starred => rsx! { ListPage { title: "page-starred-title", sub: "page-starred-sub" } },
                     Page::Folder => rsx! { FolderPage {} },
                     Page::Home => rsx! { StartPage {} },
+                    Page::AiChat => rsx! { crate::ai_chat::AiChatPage {} },
+                    Page::AiTools => rsx! { crate::ai_tools::AiToolsPage {} },
                 }
             }
         }

@@ -20,13 +20,15 @@ pub fn Sidebar() -> Element {
     let page = m.page;
     let roots = m.folder_roots();
     let folder = m.folder.clone();
-    let (t_home, t_new, t_open, t_recent, t_starred, t_apps, t_folders, t_add, t_settings) = (
+    let (t_home, t_new, t_open, t_recent, t_starred, t_apps, t_chat, t_tools, t_folders, t_add, t_settings) = (
         m.t("nav-home"),
         m.t("nav-new"),
         m.t("nav-open"),
         m.t("nav-recent"),
         m.t("nav-starred"),
         m.t("nav-apps"),
+        m.t("nav-ai-chat"),
+        m.t("nav-ai-tools"),
         m.t("nav-folders"),
         m.t("nav-add-folder"),
         m.t("nav-settings"),
@@ -63,6 +65,17 @@ pub fn Sidebar() -> Element {
             button { class: on(Page::CraftApps), onclick: move |_| run(model, Command::ShowPage(Page::CraftApps)),
                 Icon { name: "apps" }
                 span { class: "t", "{t_apps}" }
+            }
+            div { class: "side-title",
+                span { "Glyphra AI" }
+            }
+            button { class: on(Page::AiChat), onclick: move |_| run(model, Command::ShowPage(Page::AiChat)),
+                Icon { name: "chat" }
+                span { class: "t", "{t_chat}" }
+            }
+            button { class: on(Page::AiTools), onclick: move |_| run(model, Command::ShowPage(Page::AiTools)),
+                Icon { name: "tools" }
+                span { class: "t", "{t_tools}" }
             }
             div { class: "side-title",
                 span { "{t_folders}" }

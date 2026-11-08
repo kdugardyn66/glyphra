@@ -4,6 +4,9 @@
 //! * [`app`] is the root component: splash while things load, then the window.
 //! * The other modules are Dioxus components that only read the model and send commands.
 
+pub mod ai;
+mod ai_chat;
+mod ai_tools;
 pub mod app;
 mod doc;
 mod home;

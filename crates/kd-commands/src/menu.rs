@@ -201,6 +201,8 @@ pub fn menu_bar(mac: bool) -> Vec<Menu> {
             C(Command::ShowPage(Page::Recent)),
             C(Command::ShowPage(Page::Starred)),
             C(Command::ShowPage(Page::CraftApps)),
+            C(Command::ShowPage(Page::AiChat)),
+            C(Command::ShowPage(Page::AiTools)),
             Sep,
             Entry::Submenu(theme),
             C(Command::CycleTheme),

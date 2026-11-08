@@ -5,6 +5,7 @@
 //! Trash, quitting). The model knows nothing about Dioxus, so all of this is tested without a
 //! window.
 
+use crate::ai::{AiState, ToolRun};
 use crate::preview;
 use glyphra_i18n::{Arg, Catalog, I18n};
 use kd_commands::menu::{MenuView, WindowItem};
@@ -16,6 +17,7 @@ use kd_store::{
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 /// Something only the platform layer can do.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -42,6 +44,8 @@ pub enum Effect {
     PickDocumentsFolderDialog,
     /// Open a document in a window of its own (or bring that window forward).
     OpenInWindow(PathBuf),
+    /// Show the system Open dialog for a file to add to the AI chat; the answer goes to [`AppModel::ai_attached`].
+    AiAttachDialog,
 }
 
 /// What a tab shows.
@@ -150,6 +154,8 @@ pub struct AppModel {
     pub detached: bool,
     /// Documents that have a window of their own right now (kept up to date by the window layer).
     pub open_windows: Vec<PathBuf>,
+    /// Glyphra AI: providers, keys, the chat and the tools.
+    pub ai: AiState,
     pub toast: Option<Toast>,
     toast_seq: u64,
     /// Bumped whenever files may have changed, so views re-read the disk.
@@ -208,6 +214,7 @@ impl AppModel {
             app_icons: HashMap::new(),
             detached: false,
             open_windows: Vec::new(),
+            ai: AiState::empty(),
             toast: None,
             toast_seq: 0,
             revision: 0,
@@ -216,10 +223,21 @@ impl AppModel {
 
     /// Load settings and the library, the languages and the installed apps.
     pub fn load(store: Store, catalog: Catalog, system_language: String) -> AppModel {
+        Self::load_with(store, catalog, system_language, Arc::new(kd_store::Keychain))
+    }
+
+    /// [`AppModel::load`] with the secrets kept somewhere else (tests keep them in memory).
+    pub fn load_with(store: Store, catalog: Catalog, system_language: String, secrets: Arc<dyn kd_store::SecretStore>) -> AppModel {
         let (state, _first) = store.load_or_init();
         let i18n = I18n::new(&catalog, &state.settings.language, &system_language);
+        let dir = store.dir().to_path_buf();
         let mut m = Self::assemble(store, state, catalog, i18n, system_language, detect_installed());
         m.load_app_icons();
+        let (ai, warning) = AiState::load(dir, secrets);
+        m.ai = ai;
+        if let Some(w) = warning {
+            m.fail("error-keychain", &w);
+        }
         m
     }
 
@@ -632,9 +650,100 @@ impl AppModel {
                 self.go_home();
                 return vec![Effect::FocusSearch];
             }
+            Command::AiSend(text) => {
+                self.ai.chat.draft = text;
+                let context = self.ai_context();
+                self.ai.chat.send(&self.ai.hub, context);
+                self.ai.attachment = None;
+            }
+            Command::AiStop => {
+                self.ai.chat.stop();
+                if let Some(run) = &self.ai.tool
+                    && let Some(job) = &run.job
+                {
+                    job.cancel();
+                }
+            }
+            Command::AiNewChat => {
+                self.ai.chat.clear();
+                self.ai.attachment = None;
+            }
+            Command::AiSelectModel(m) => self.ai.chat.model = m.as_deref().and_then(kd_ai::ModelRef::parse),
+            Command::AiAttach => return vec![Effect::AiAttachDialog],
+            Command::AiDetach => self.ai.attachment = None,
+            Command::AiToggleStarred => self.ai.chat.use_starred = !self.ai.chat.use_starred,
+            Command::AiOpenTool(id) => {
+                if let Some(task) = kd_ai::tasks::task(&id) {
+                    self.go_home();
+                    self.page = Page::AiTools;
+                    self.ai.tool = Some(ToolRun { task, output: String::new(), error: None, job: None });
+                }
+            }
+            Command::AiCloseTool => {
+                if let Some(run) = self.ai.tool.take()
+                    && let Some(job) = run.job
+                {
+                    job.cancel();
+                }
+            }
+            Command::AiRunTool { input, note } => {
+                let hub = self.ai.hub.clone();
+                if let Some(run) = self.ai.tool.as_mut()
+                    && run.job.is_none()
+                    && !input.trim().is_empty()
+                {
+                    run.output.clear();
+                    run.error = None;
+                    run.job = Some(hub.start(run.task.request_with(&note, &input), None));
+                }
+            }
+            Command::AiSaveToolResult => return self.save_tool_result(),
             Command::Quit => return vec![Effect::Quit],
         }
         Vec::new()
+    }
+
+    // ------------------------------------------------------------------ Glyphra AI
+
+    /// The extra context of the next chat message: the attached file, and the starred files when asked.
+    fn ai_context(&self) -> Option<String> {
+        let mut parts = Vec::new();
+        if let Some((_, text)) = &self.ai.attachment {
+            parts.push(text.clone());
+        }
+        if self.ai.chat.use_starred
+            && let Some(t) = kd_ai::starred_context(&self.state.library.starred, kd_ai::CONTEXT_BUDGET)
+        {
+            parts.push(t);
+        }
+        (!parts.is_empty()).then(|| parts.join("\n\n"))
+    }
+
+    /// The Open dialog picked a file for the AI chat.
+    pub fn ai_attached(&mut self, path: &Path) {
+        match kd_ai::file_context(path, kd_ai::CONTEXT_BUDGET) {
+            Some(text) => {
+                let name = path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
+                self.ai.attachment = Some((name, text));
+            }
+            None => self.notify("toast-ai-unreadable"),
+        }
+    }
+
+    /// Write the open tool's result to a new Markdown document and open it.
+    fn save_tool_result(&mut self) -> Vec<Effect> {
+        let Some(text) = self.ai.tool.as_ref().map(|r| r.output.clone()).filter(|t| !t.trim().is_empty()) else { return Vec::new() };
+        let dir = self.state.settings.documents_dir.clone();
+        match create_new_document(ModuleKind::Markdown, &dir).and_then(|p| fs::write(&p, &text).map(|()| p)) {
+            Ok(path) => {
+                self.revision += 1;
+                self.open_path(&path)
+            }
+            Err(e) => {
+                self.fail("error-create", &e.to_string());
+                Vec::new()
+            }
+        }
     }
 
     // ------------------------------------------------------------------ answers to questions
@@ -747,6 +856,7 @@ impl AppModel {
     pub fn open_settings(&mut self, section: SettingsSection) {
         if self.settings.is_none() {
             self.draft = self.state.settings.clone();
+            self.ai.reset_draft();
         }
         self.settings = Some(section);
     }
@@ -755,6 +865,7 @@ impl AppModel {
     pub fn close_settings(&mut self) {
         self.settings = None;
         self.draft = self.state.settings.clone();
+        self.ai.reset_draft();
     }
 
     /// The editable settings as one comparable value.
@@ -764,7 +875,7 @@ impl AppModel {
 
     /// Has anything been changed in the dialog (is Apply useful)?
     pub fn settings_dirty(&self) -> bool {
-        Self::editable(&self.draft) != Self::editable(&self.state.settings)
+        Self::editable(&self.draft) != Self::editable(&self.state.settings) || self.ai.dirty()
     }
 
     /// Make the draft real: save it, switch language and theme, create the documents folder.
@@ -772,6 +883,11 @@ impl AppModel {
     pub fn apply_settings(&mut self) -> bool {
         if !self.settings_dirty() {
             return true;
+        }
+        if self.ai.dirty()
+            && let Err(e) = self.ai.save()
+        {
+            self.fail("error-keychain", &e);
         }
         let d = self.draft.clone();
         if d.documents_dir.as_os_str().is_empty() {
@@ -823,7 +939,7 @@ mod tests {
         let store = Store::at(tmp.join("cfg"));
         let (catalog, issues) = Catalog::load(None);
         assert!(issues.is_empty());
-        let mut m = AppModel::load(store, catalog, "en".into());
+        let mut m = AppModel::load_with(store, catalog, "en".into(), std::sync::Arc::new(kd_store::MemorySecrets::default()));
         m.state.settings.documents_dir = tmp.join("docs");
         m.folder = tmp.join("docs");
         fs::create_dir_all(&m.folder).unwrap();
@@ -1264,6 +1380,210 @@ mod tests {
                 Entry::Submenu(m) => collect_menu_ids(m, ids),
                 Entry::Separator => {}
             }
+        }
+    }
+
+    // ------------------------------------------------------------------ Glyphra AI
+
+    /// A one-request OpenAI-style server that streams "Hello there" and then stops.
+    fn mock_ai_server() -> String {
+        use std::io::{Read, Write};
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let url = format!("http://{}/v1", listener.local_addr().unwrap());
+        std::thread::spawn(move || {
+            for stream in listener.incoming() {
+                let Ok(mut s) = stream else { break };
+                std::thread::spawn(move || {
+                    let mut buf = Vec::new();
+                    let mut chunk = [0u8; 4096];
+                    // read the headers and the body
+                    loop {
+                        let n = s.read(&mut chunk).unwrap_or(0);
+                        if n == 0 {
+                            return;
+                        }
+                        buf.extend_from_slice(&chunk[..n]);
+                        let text = String::from_utf8_lossy(&buf).to_string();
+                        if let Some(h) = text.find("\r\n\r\n") {
+                            let len = text[..h]
+                                .lines()
+                                .find_map(|l| {
+                                    l.to_ascii_lowercase().strip_prefix("content-length:").map(|v| v.trim().parse::<usize>().unwrap_or(0))
+                                })
+                                .unwrap_or(0);
+                            if buf.len() >= h + 4 + len {
+                                break;
+                            }
+                        }
+                    }
+                    let body = "data: {\"choices\":[{\"delta\":{\"content\":\"Hello\"}}]}\n\ndata: {\"choices\":[{\"delta\":{\"content\":\" there\"},\"finish_reason\":\"stop\"}]}\n\ndata: [DONE]\n\n";
+                    let _ = write!(
+                        s,
+                        "HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nConnection: close\r\nContent-Length: {}\r\n\r\n{body}",
+                        body.len()
+                    );
+                });
+            }
+        });
+        url
+    }
+
+    /// Set up a local provider through the settings dialog, as the user does.
+    fn with_local_ai(m: &mut AppModel, url: &str) {
+        m.open_settings(SettingsSection::Ai);
+        m.ai.draft.provider_mut("lmstudio").unwrap().base_url = Some(url.into());
+        m.ai.draft.provider_mut("lmstudio").unwrap().default_model = Some("local-model".into());
+        m.ai.set_default_model("lmstudio:local-model");
+        m.ai.draft.max_retries = 0; // a failing server fails at once
+        assert!(m.settings_dirty(), "a change in Settings › AI makes Apply useful");
+        assert!(m.apply_settings());
+        m.close_settings();
+        assert!(!m.settings_dirty());
+    }
+
+    fn wait_for_ai(m: &mut AppModel) {
+        for _ in 0..200 {
+            m.ai.pump();
+            if !m.ai.busy() {
+                return;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(25));
+        }
+        panic!("the AI request did not finish");
+    }
+
+    #[test]
+    fn the_ai_chat_streams_an_answer() {
+        let tmp = tempfile::tempdir().unwrap();
+        let mut m = model(tmp.path());
+        let url = mock_ai_server();
+        assert!(!m.ai.ready() || std::env::vars().any(|(k, _)| k.ends_with("_API_KEY")));
+        with_local_ai(&mut m, &url);
+        assert!(m.ai.ready());
+        m.dispatch(Command::ShowPage(Page::AiChat));
+        assert_eq!(m.page, Page::AiChat);
+        m.dispatch(Command::AiSend("Say hello".into()));
+        assert!(m.ai.chat.running());
+        wait_for_ai(&mut m);
+        let msgs = &m.ai.chat.messages;
+        assert_eq!(msgs.len(), 2);
+        assert_eq!(msgs[0].text, "Say hello");
+        assert_eq!(msgs[1].text, "Hello there");
+        assert!(!msgs[1].error);
+        m.dispatch(Command::AiNewChat);
+        assert!(m.ai.chat.messages.is_empty());
+    }
+
+    #[test]
+    fn a_failing_provider_shows_an_error_in_the_chat() {
+        let tmp = tempfile::tempdir().unwrap();
+        let mut m = model(tmp.path());
+        // nothing listens on this port
+        with_local_ai(&mut m, "http://127.0.0.1:9/v1");
+        m.dispatch(Command::AiSend("hi".into()));
+        wait_for_ai(&mut m);
+        let last = m.ai.chat.messages.last().unwrap();
+        assert!(last.error && !last.text.is_empty(), "{last:?}");
+    }
+
+    #[test]
+    fn an_ai_tool_runs_and_its_result_becomes_a_document() {
+        let tmp = tempfile::tempdir().unwrap();
+        let mut m = model(tmp.path());
+        let url = mock_ai_server();
+        with_local_ai(&mut m, &url);
+        m.dispatch(Command::AiOpenTool("md.improve".into()));
+        assert_eq!(m.page, Page::AiTools);
+        assert!(m.ai.tool.is_some());
+        m.dispatch(Command::AiRunTool { input: "  ".into(), note: String::new() });
+        assert!(!m.ai.tool.as_ref().unwrap().running(), "no text, no request");
+        m.dispatch(Command::AiRunTool { input: "teh text".into(), note: "shorter".into() });
+        assert!(m.ai.tool.as_ref().unwrap().running());
+        wait_for_ai(&mut m);
+        assert_eq!(m.ai.tool.as_ref().unwrap().output, "Hello there");
+        let before = m.tabs.len();
+        m.dispatch(Command::AiSaveToolResult);
+        assert_eq!(m.tabs.len(), before + 1, "the result opens as a document");
+        let saved: Vec<_> = fs::read_dir(tmp.path().join("docs")).unwrap().flatten().collect();
+        assert_eq!(saved.len(), 1);
+        assert_eq!(fs::read_to_string(saved[0].path()).unwrap(), "Hello there");
+        m.dispatch(Command::AiCloseTool);
+        assert!(m.ai.tool.is_none());
+    }
+
+    #[test]
+    fn the_ai_settings_wait_for_apply_and_close_drops_them() {
+        let tmp = tempfile::tempdir().unwrap();
+        let mut m = model(tmp.path());
+        m.open_settings(SettingsSection::Ai);
+        m.ai.draft.provider_mut("anthropic").unwrap().api_key = Some("sk-ant-x".into());
+        assert!(m.settings_dirty());
+        assert!(m.ai.hub.config().provider("anthropic").unwrap().api_key.is_none(), "nothing is in force before Apply");
+        m.close_settings();
+        assert!(!m.settings_dirty());
+        assert!(m.ai.draft.provider("anthropic").unwrap().api_key.is_none(), "Close drops the draft");
+        let ai_toml = tmp.path().join("cfg").join("ai.toml");
+        m.open_settings(SettingsSection::Ai);
+        m.ai.draft.provider_mut("anthropic").unwrap().api_key = Some("sk-ant-x".into());
+        assert!(m.apply_settings());
+        assert!(m.ai.ready());
+        let text = fs::read_to_string(ai_toml).unwrap();
+        assert!(!text.contains("sk-ant-x"), "the key is not in the file");
+    }
+
+    #[test]
+    fn the_settings_dialog_blocks_the_ai_commands_too() {
+        let tmp = tempfile::tempdir().unwrap();
+        let mut m = model(tmp.path());
+        m.open_settings(SettingsSection::General);
+        m.dispatch(Command::AiToggleStarred);
+        assert!(!m.ai.chat.use_starred);
+        m.close_settings();
+        m.dispatch(Command::AiToggleStarred);
+        assert!(m.ai.chat.use_starred);
+    }
+
+    #[test]
+    fn every_string_the_ai_screens_use_exists_in_every_language() {
+        use std::collections::BTreeSet;
+        let mut ids: BTreeSet<String> = BTreeSet::new();
+        let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
+        for f in ["ai_chat.rs", "ai_tools.rs", "settings.rs", "sidebar.rs"] {
+            let text = fs::read_to_string(dir.join(f)).unwrap();
+            for part in text.split("t(\"").skip(1) {
+                if let Some(id) = part.split('"').next()
+                    && id.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
+                    && !id.is_empty()
+                {
+                    ids.insert(id.to_string());
+                }
+            }
+            for part in text.split("(\"").skip(1) {
+                if let Some(id) = part.split('"').next()
+                    && (id.starts_with("chip-") || id.starts_with("ai-"))
+                    && id.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
+                {
+                    ids.insert(id.to_string());
+                }
+            }
+        }
+        for t in kd_ai::tasks::TASKS {
+            let k = format!("tool-{}", t.id.replace('.', "-"));
+            ids.insert(format!("{k}-desc"));
+            ids.insert(k);
+        }
+        for s in kd_ai::Scope::ALL {
+            ids.insert(format!("ai-scope-{}", s.id()));
+        }
+        for g in ["markdown", "pdf", "drawing"] {
+            ids.insert(format!("ai-group-{g}"));
+        }
+        assert!(ids.len() > 80, "found only {} ids", ids.len());
+        let (catalog, _) = Catalog::load(None);
+        for l in catalog.locales() {
+            let i = I18n::new(&catalog, &l.tag, "");
+            let missing: Vec<_> = ids.iter().filter(|id| !i.has(id)).collect();
+            assert!(missing.is_empty(), "{} lacks {missing:?}", l.tag);
         }
     }
 }

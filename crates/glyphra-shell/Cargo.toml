@@ -10,6 +10,7 @@ rust-version.workspace = true
 [dependencies]
 kd-commands.workspace = true
 kd-store.workspace = true
+kd-ai.workspace = true
 glyphra-i18n.workspace = true
 dioxus = { version = "0.7", features = ["desktop"] }
 tokio = { version = "1", features = ["rt", "time"] }

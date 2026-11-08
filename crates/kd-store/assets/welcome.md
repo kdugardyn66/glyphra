@@ -7,6 +7,7 @@ app, with Glyphra AI at your side and team collaboration on your own server.
 
 - The start screen: Start something new, Recent, Starred and your documents folder
 - Opening a Markdown file shows a read-only preview in a tab (the editor arrives in 0.3.0)
+- **AI Chat** and **AI Tools** in the sidebar; set up a provider in Settings › AI first
 - Light, dark and system themes
 - English, Dutch, French and German; more languages can be added as language packs
 
@@ -14,7 +15,6 @@ app, with Glyphra AI at your side and team collaboration on your own server.
 
 | Release | What arrives |
 | --- | --- |
-| 0.2.0 | Glyphra AI: providers, models and the AI panel |
 | 0.3.0 | The Markdown editor, ribbon and side panels |
 | 0.4.0 | The finished standalone app |
 | 0.5.0 | Collaboration and the document server |

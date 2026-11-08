@@ -14,5 +14,13 @@ rusqlite.workspace = true
 plist.workspace = true
 directories.workspace = true
 
+# System keychain: macOS Keychain, Windows Credential Manager, Linux Secret Service (libdbus is built in).
+[target.'cfg(target_os = "macos")'.dependencies]
+keyring = { version = "3", default-features = false, features = ["apple-native"] }
+[target.'cfg(target_os = "windows")'.dependencies]
+keyring = { version = "3", default-features = false, features = ["windows-native"] }
+[target.'cfg(target_os = "linux")'.dependencies]
+keyring = { version = "3", default-features = false, features = ["sync-secret-service", "crypto-rust", "vendored"] }
+
 [dev-dependencies]
 tempfile.workspace = true

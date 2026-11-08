@@ -23,7 +23,9 @@ rules both earlier builds (mdCraft, KaDeePlatform) learned the hard way.
    anything per language; use CSS logical properties (`margin-inline-start`) so right-to-left works.
 7. **Colours come from CSS variables** in `glyphra.css`; never hard-code a colour in a component.
 8. **Raw HTML from documents is never passed to the web view.** The preview escapes it.
-9. No shared crates between this repository and the earlier ones: code is copied once, then owned here.
+9. **API keys live in the system keychain**, never in `ai.toml` or any other file (`ProviderConfig::api_key`
+   is `skip_serializing`). `kd-ai` is the one crate that may `expect` on lock poisoning and the built-in catalog.
+10. No shared crates between this repository and the earlier ones: code is copied once, then owned here.
 
 ## Commands
 
@@ -46,7 +48,8 @@ the scripts, `packaging/` and `apps/glyphra/Dioxus.toml`: change all of them tog
 | Path | What |
 | --- | --- |
 | `crates/kd-commands` | Commands, key maps, the menu bar as data |
-| `crates/kd-store` | Settings, Recent and Starred (SQLite), module and Crafting Apps catalogues, file helpers |
+| `crates/kd-ai` | Glyphra AI: providers, models, streaming jobs, chat state, tasks (no UI). Copied once from KaDeePlatform |
+| `crates/kd-store` | Settings, the keychain (`secrets`), Recent and Starred (SQLite), module and Crafting Apps catalogues, file helpers |
 | `crates/glyphra-i18n` | Fluent loader, built-in and user language packs, fallback to English |
 | `crates/glyphra-shell` | Model, dispatcher and the Dioxus components |
 | `apps/glyphra` | The binary and the native menu |

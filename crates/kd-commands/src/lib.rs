@@ -26,12 +26,18 @@ pub enum Page {
     Starred,
     Folder,
     CraftApps,
+    /// Glyphra AI's chat.
+    AiChat,
+    /// Ready-made AI actions for documents.
+    AiTools,
 }
 
 /// Sections of the Settings window.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SettingsSection {
     General,
+    /// Glyphra AI: providers, keys and models.
+    Ai,
     Keyboard,
     About,
     /// License Agreement: the MIT license.
@@ -41,8 +47,9 @@ pub enum SettingsSection {
 }
 
 impl SettingsSection {
-    pub const ALL: [SettingsSection; 5] = [
+    pub const ALL: [SettingsSection; 6] = [
         SettingsSection::General,
+        SettingsSection::Ai,
         SettingsSection::Keyboard,
         SettingsSection::About,
         SettingsSection::LicenseMit,
@@ -52,6 +59,7 @@ impl SettingsSection {
     pub fn label(self) -> &'static str {
         match self {
             SettingsSection::General => "General",
+            SettingsSection::Ai => "AI",
             SettingsSection::Keyboard => "Keyboard",
             SettingsSection::About => "About",
             SettingsSection::LicenseMit => "License — MIT",
@@ -62,6 +70,7 @@ impl SettingsSection {
     pub fn id(self) -> &'static str {
         match self {
             SettingsSection::General => "general",
+            SettingsSection::Ai => "ai",
             SettingsSection::Keyboard => "keyboard",
             SettingsSection::About => "about",
             SettingsSection::LicenseMit => "license-mit",
@@ -133,6 +142,31 @@ pub enum Command {
     Refresh,
     /// Put the cursor in the search box of the document list.
     FocusSearch,
+    /// Send this message in the AI chat.
+    AiSend(String),
+    /// Stop the answer that is being written.
+    AiStop,
+    /// Start a new AI chat (the old one is dropped).
+    AiNewChat,
+    /// Choose the model of the AI chat (`provider:model`); `None` = the one from Settings › AI.
+    AiSelectModel(Option<String>),
+    /// Open an AI tool by its task id (`md.improve`).
+    AiOpenTool(String),
+    /// Leave the open AI tool.
+    AiCloseTool,
+    /// Run the open AI tool on `input`, with an optional remark of the user's (`note`).
+    AiRunTool {
+        input: String,
+        note: String,
+    },
+    /// Add a file to the next AI chat message (the system's Open dialog).
+    AiAttach,
+    /// Leave out the attached file.
+    AiDetach,
+    /// Use (or stop using) the starred files as context of the AI chat.
+    AiToggleStarred,
+    /// Save the open AI tool's result as a new Markdown document.
+    AiSaveToolResult,
     /// Quit Glyphra.
     Quit,
 }
@@ -177,6 +211,17 @@ impl Command {
             Command::OpenUrl(_) => "app.open_url".into(),
             Command::Refresh => "home.refresh".into(),
             Command::FocusSearch => "home.search".into(),
+            Command::AiSend(_) => "ai.send".into(),
+            Command::AiStop => "ai.stop".into(),
+            Command::AiNewChat => "ai.new_chat".into(),
+            Command::AiSelectModel(_) => "ai.select_model".into(),
+            Command::AiOpenTool(_) => "ai.tool.open".into(),
+            Command::AiCloseTool => "ai.tool.close".into(),
+            Command::AiRunTool { .. } => "ai.tool.run".into(),
+            Command::AiAttach => "ai.attach".into(),
+            Command::AiDetach => "ai.detach".into(),
+            Command::AiToggleStarred => "ai.starred".into(),
+            Command::AiSaveToolResult => "ai.tool.save".into(),
             Command::Quit => "app.quit".into(),
         }
     }
@@ -230,9 +275,13 @@ pub fn bindable_commands() -> Vec<(Command, String)> {
         (Command::ShowPage(Page::Recent), "Show Recent".into()),
         (Command::ShowPage(Page::Starred), "Show Starred".into()),
         (Command::ShowPage(Page::CraftApps), "Show Apps".into()),
+        (Command::ShowPage(Page::AiChat), "Show AI Chat".into()),
+        (Command::ShowPage(Page::AiTools), "Show AI Tools".into()),
+        (Command::AiNewChat, "New AI chat".into()),
         (Command::ShowPage(Page::Folder), "Show the Glyphra folder".into()),
         (Command::PinFolder, "Add a folder to the sidebar…".into()),
         (Command::OpenSettings(SettingsSection::General), "Settings".into()),
+        (Command::OpenSettings(SettingsSection::Ai), "AI settings".into()),
         (Command::OpenSettings(SettingsSection::Keyboard), "Keyboard shortcuts".into()),
         (Command::OpenSettings(SettingsSection::About), "About Glyphra".into()),
         (Command::OpenSettings(SettingsSection::LicenseMit), "License — MIT".into()),

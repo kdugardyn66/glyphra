@@ -12,6 +12,7 @@ pub mod files;
 pub mod installed;
 pub mod library;
 pub mod modules;
+pub mod secrets;
 pub mod settings;
 pub mod store;
 
@@ -25,6 +26,7 @@ pub use files::{
 pub use installed::{InstalledApp, Launch, detect_installed};
 pub use library::{Library, RecentEntry};
 pub use modules::ModuleKind;
+pub use secrets::{Keychain, MemorySecrets, SecretError, SecretStore};
 pub use settings::{OpenIn, Settings, StoredShortcut, ThemePref};
 pub use store::{HomeState, Store};
 

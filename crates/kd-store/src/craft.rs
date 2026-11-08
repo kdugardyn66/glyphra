@@ -171,7 +171,7 @@ pub const CRAFT_APPS: [CraftApp; 18] = [
         maker: ARTCRAFT,
         badge: "MAT",
         group: DocGroup::Graphics,
-        extensions: &["sbs", "mcraft", "mcmat"],
+        extensions: &["mcraft", "sbs", "mcmat"],
     },
     CraftApp {
         name: "PdfCraft",

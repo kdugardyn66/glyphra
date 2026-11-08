@@ -100,7 +100,7 @@ pub fn AiChatPage() -> Element {
                     button {
                         class: "icon-btn",
                         title: "{l_settings}",
-                        onclick: move |_| run(model, Command::OpenSettings(SettingsSection::Ai)),
+                        onclick: move |_| run(model, Command::OpenSettings(SettingsSection::AiProviders)),
                         Icon { name: "settings" }
                     }
                 }
@@ -108,7 +108,7 @@ pub fn AiChatPage() -> Element {
             if !ready {
                 div { class: "ai-note",
                     span { "{l_setup}" }
-                    button { class: "btn primary", onclick: move |_| run(model, Command::OpenSettings(SettingsSection::Ai)), "{l_setup_btn}" }
+                    button { class: "btn primary", onclick: move |_| run(model, Command::OpenSettings(SettingsSection::AiProviders)), "{l_setup_btn}" }
                 }
             }
             div { class: "ai-body", id: "chat-log",

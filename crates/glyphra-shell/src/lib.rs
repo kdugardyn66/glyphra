@@ -15,6 +15,7 @@ mod modal;
 pub mod model;
 mod preview;
 mod settings;
+mod settings_ai;
 mod sidebar;
 mod tabs;
 

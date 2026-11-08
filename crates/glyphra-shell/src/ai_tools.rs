@@ -97,7 +97,7 @@ pub fn AiToolsPage() -> Element {
             if !ready {
                 div { class: "ai-note",
                     span { "{l_setup}" }
-                    button { class: "btn primary", onclick: move |_| run(model, Command::OpenSettings(SettingsSection::Ai)), "{l_setup_btn}" }
+                    button { class: "btn primary", onclick: move |_| run(model, Command::OpenSettings(SettingsSection::AiProviders)), "{l_setup_btn}" }
                 }
             }
             for (heading , cards) in groups {

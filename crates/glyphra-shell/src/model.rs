@@ -1430,7 +1430,7 @@ mod tests {
 
     /// Set up a local provider through the settings dialog, as the user does.
     fn with_local_ai(m: &mut AppModel, url: &str) {
-        m.open_settings(SettingsSection::Ai);
+        m.open_settings(SettingsSection::AiProviders);
         m.ai.draft.provider_mut("lmstudio").unwrap().base_url = Some(url.into());
         m.ai.draft.provider_mut("lmstudio").unwrap().default_model = Some("local-model".into());
         m.ai.set_default_model("lmstudio:local-model");
@@ -1515,7 +1515,7 @@ mod tests {
     fn the_ai_settings_wait_for_apply_and_close_drops_them() {
         let tmp = tempfile::tempdir().unwrap();
         let mut m = model(tmp.path());
-        m.open_settings(SettingsSection::Ai);
+        m.open_settings(SettingsSection::AiProviders);
         m.ai.draft.provider_mut("anthropic").unwrap().api_key = Some("sk-ant-x".into());
         assert!(m.settings_dirty());
         assert!(m.ai.hub.config().provider("anthropic").unwrap().api_key.is_none(), "nothing is in force before Apply");
@@ -1523,7 +1523,7 @@ mod tests {
         assert!(!m.settings_dirty());
         assert!(m.ai.draft.provider("anthropic").unwrap().api_key.is_none(), "Close drops the draft");
         let ai_toml = tmp.path().join("cfg").join("ai.toml");
-        m.open_settings(SettingsSection::Ai);
+        m.open_settings(SettingsSection::AiProviders);
         m.ai.draft.provider_mut("anthropic").unwrap().api_key = Some("sk-ant-x".into());
         assert!(m.apply_settings());
         assert!(m.ai.ready());
@@ -1548,7 +1548,7 @@ mod tests {
         use std::collections::BTreeSet;
         let mut ids: BTreeSet<String> = BTreeSet::new();
         let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
-        for f in ["ai_chat.rs", "ai_tools.rs", "settings.rs", "sidebar.rs"] {
+        for f in ["ai_chat.rs", "ai_tools.rs", "settings.rs", "settings_ai.rs", "sidebar.rs"] {
             let text = fs::read_to_string(dir.join(f)).unwrap();
             for part in text.split("t(\"").skip(1) {
                 if let Some(id) = part.split('"').next()
@@ -1574,6 +1574,12 @@ mod tests {
         }
         for s in kd_ai::Scope::ALL {
             ids.insert(format!("ai-scope-{}", s.id()));
+        }
+        for r in ["eu", "apac", "us", "local"] {
+            ids.insert(format!("ai-region-{r}"));
+        }
+        for (id, _, _) in kd_ai::ProviderKind::ALL.iter().map(|k| crate::ai::status(&kd_ai::ProviderConfig::new(*k))) {
+            ids.insert(id.to_string());
         }
         for g in ["markdown", "pdf", "drawing"] {
             ids.insert(format!("ai-group-{g}"));

@@ -1,9 +1,10 @@
 //! Glyphra AI inside the model: the configuration (with its draft for Settings › AI), the keys
 //! in the system keychain, the AI Chat conversation and the AI Tools run. No UI code.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, HashMap};
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::sync::mpsc::{Receiver, channel};
 
 use kd_ai::tasks::Task;
 use kd_ai::{AiConfig, AiError, AiHub, Catalog, ChatState, Job, JobEvent, ModelRef, ProviderConfig, ProviderKind, Scope};
@@ -17,6 +18,84 @@ pub fn secret_name(provider_id: &str) -> String {
 /// The short name of a provider for model labels: its own name, else the company ("Anthropic").
 fn short_name(p: &ProviderConfig) -> String {
     p.name.clone().filter(|n| !n.trim().is_empty()).unwrap_or_else(|| p.kind.vendor().to_string())
+}
+
+/// Which screen of Settings › AI providers is showing.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub enum AiScreen {
+    #[default]
+    List,
+    /// Choose the kind of provider to add.
+    AddKind,
+    /// Fill in the provider chosen on [`AiScreen::AddKind`] (it is in [`AiState::form`]).
+    AddForm,
+    /// Edit the provider with this id.
+    Edit(String),
+}
+
+/// The result of "Test connection".
+/// What a connection test reports: the models, and the account note.
+type TestAnswer = Result<(Vec<String>, Option<String>), String>;
+
+pub enum TestState {
+    Running(Receiver<TestAnswer>),
+    /// The models the server offers, and its account note (credits, usage).
+    Ok(Vec<String>, Option<String>),
+    Err(String),
+}
+
+/// A provider's coloured square and initials (brand colours, so not theme variables).
+pub fn kind_badge(kind: ProviderKind) -> (&'static str, &'static str) {
+    use ProviderKind as K;
+    match kind {
+        K::AlephAlpha => ("#1F2937", "AA"),
+        K::BlackForestLabs => ("#111111", "BF"),
+        K::DeepL => ("#0F2B46", "DL"),
+        K::Mistral => ("#FA520F", "M"),
+        K::Alibaba => ("#FF6A00", "Qw"),
+        K::DeepSeek => ("#4D6BFE", "DS"),
+        K::Moonshot => ("#16162A", "K"),
+        K::Sakana => ("#C81E3A", "S"),
+        K::Zai => ("#2D3A8C", "Z"),
+        K::Anthropic => ("#D97757", "A"),
+        K::Cohere => ("#39594D", "Co"),
+        K::Gemini => ("#4285F4", "G"),
+        K::Meta => ("#0467DF", "M"),
+        K::Microsoft => ("#0078D4", "MS"),
+        K::OpenAi => ("#10A37F", "O"),
+        K::SpaceXAi => ("#000000", "X"),
+        K::LmStudio => ("#6B46C1", "LM"),
+        K::Ollama => ("#4B5563", "Ol"),
+        K::OpenAiCompatible => ("#64748B", "</>"),
+        K::Custom => ("#64748B", "+"),
+    }
+}
+
+/// The title on the Add screen: the company, or "Custom provider".
+pub fn kind_title(kind: ProviderKind) -> &'static str {
+    match kind {
+        ProviderKind::Custom => "Custom provider",
+        ProviderKind::OpenAiCompatible => "OpenAI-compatible",
+        k => k.vendor(),
+    }
+}
+
+/// How a provider stands: (Fluent id, variable, tone) with tone 1 good, 2 bad, 0 muted.
+pub fn status(p: &ProviderConfig) -> (&'static str, Option<String>, u8) {
+    use kd_ai::KeySource;
+    if !p.enabled {
+        return ("ai-status-off", None, 0);
+    }
+    if p.base_url().is_empty() {
+        return ("ai-status-endpoint", None, 2);
+    }
+    match p.key_source() {
+        KeySource::None if p.kind.needs_key() => ("ai-status-key", None, 2),
+        KeySource::Env(v) => ("ai-status-env", Some(v.to_string()), 1),
+        KeySource::Stored => ("ai-status-ready", None, 1),
+        KeySource::None if p.kind.is_local() => ("ai-status-local", None, 1),
+        KeySource::None => ("ai-status-ready", None, 1),
+    }
 }
 
 /// One model the user can pick: `value` is `provider:model`.
@@ -47,8 +126,6 @@ pub struct AiState {
     /// What Settings › AI edits; [`AiState::save`] makes it real.
     pub draft: AiConfig,
     pub catalog: Catalog,
-    /// The provider shown in Settings › AI.
-    pub selected: String,
     pub chat: ChatState,
     pub tool: Option<ToolRun>,
     /// A file added to the next chat message: (name, text for the model).
@@ -57,6 +134,12 @@ pub struct AiState {
     dir: Option<PathBuf>,
     /// Providers whose key could not be put in the keychain yet (tried again at the next Apply).
     pending: BTreeSet<String>,
+    pub screen: AiScreen,
+    /// The provider being added (see [`AiScreen::AddForm`]).
+    pub form: Option<ProviderConfig>,
+    pub key_visible: bool,
+    /// "Test connection" results by provider id.
+    pub tests: HashMap<String, TestState>,
 }
 
 impl AiState {
@@ -88,18 +171,20 @@ impl AiState {
 
     fn build(config: AiConfig, secrets: Arc<dyn SecretStore>, dir: Option<PathBuf>) -> AiState {
         let hub = AiHub::in_memory(config.clone());
-        let selected = config.providers.first().map(|p| p.id.clone()).unwrap_or_default();
         AiState {
             catalog: hub.catalog(),
             hub,
             draft: config,
-            selected,
             chat: ChatState::new(None, false),
             tool: None,
             attachment: None,
             secrets,
             dir,
             pending: BTreeSet::new(),
+            screen: AiScreen::List,
+            form: None,
+            key_visible: false,
+            tests: HashMap::new(),
         }
     }
 
@@ -110,18 +195,57 @@ impl AiState {
     }
 
     pub fn reset_draft(&mut self) {
+        self.screen = AiScreen::List;
+        self.form = None;
+        self.key_visible = false;
+        self.tests.clear();
         self.draft = self.hub.config();
-        if self.draft.provider(&self.selected).is_none() {
-            self.selected = self.draft.providers.first().map(|p| p.id.clone()).unwrap_or_default();
+    }
+
+    pub fn show(&mut self, screen: AiScreen) {
+        self.key_visible = false;
+        if screen != AiScreen::AddForm {
+            self.form = None;
+        }
+        self.screen = screen;
+    }
+
+    /// A kind was chosen on the Add screen: start its form.
+    pub fn choose_kind(&mut self, kind: ProviderKind) {
+        let mut p = ProviderConfig::new(kind);
+        p.id = self.draft.free_id(kind.default_id());
+        self.form = Some(p);
+        self.show(AiScreen::AddForm);
+    }
+
+    /// The provider on the form goes into the draft and is shown for editing.
+    pub fn add_form_provider(&mut self) {
+        if let Some(p) = self.form.take() {
+            let id = p.id.clone();
+            self.draft.providers.push(p);
+            self.show(AiScreen::Edit(id));
         }
     }
 
-    /// Add a provider of this kind (a second one of the same kind gets a numbered id) and select it.
-    pub fn add_provider(&mut self, kind: ProviderKind) {
-        let mut p = ProviderConfig::new(kind);
-        p.id = self.draft.free_id(kind.default_id());
-        self.selected = p.id.clone();
-        self.draft.providers.push(p);
+    /// The provider the form on screen edits: the new one, or one in the draft.
+    pub fn target(&mut self) -> Option<&mut ProviderConfig> {
+        match &self.screen {
+            AiScreen::AddForm => self.form.as_mut(),
+            AiScreen::Edit(id) => {
+                let id = id.clone();
+                self.draft.provider_mut(&id)
+            }
+            _ => None,
+        }
+    }
+
+    /// Read-only view of [`AiState::target`].
+    pub fn target_ref(&self) -> Option<&ProviderConfig> {
+        match &self.screen {
+            AiScreen::AddForm => self.form.as_ref(),
+            AiScreen::Edit(id) => self.draft.provider(id),
+            _ => None,
+        }
     }
 
     /// Take a provider out of the draft; the models that used it are forgotten.
@@ -131,9 +255,40 @@ impl AiState {
         if self.draft.default_model.as_ref().is_some_and(|m| m.provider == id) {
             self.draft.default_model = None;
         }
-        if self.selected == id {
-            self.selected = self.draft.providers.first().map(|p| p.id.clone()).unwrap_or_default();
+        self.tests.remove(id);
+        self.show(AiScreen::List);
+    }
+
+    /// Ask the provider on the form for its models, on a worker thread (see [`AiState::pump`]).
+    pub fn test_target(&mut self) {
+        let Some(p) = self.target_ref().cloned() else { return };
+        let (tx, rx) = channel();
+        let probe = AiHub::in_memory(AiConfig { providers: vec![p.clone()], ..self.draft.clone() });
+        let id = p.id.clone();
+        std::thread::spawn(move || {
+            let r = probe.fetch_models(&id).map(|list| (list, probe.account_note(&id))).map_err(|e| e.to_string());
+            let _ = tx.send(r);
+        });
+        self.tests.insert(p.id, TestState::Running(rx));
+    }
+
+    /// The models to offer for `p`: its own, the catalog's and a test's result.
+    pub fn offered(&self, p: &ProviderConfig) -> Vec<String> {
+        let mut out = p.models.clone();
+        let mut push = |m: &str| {
+            if !out.iter().any(|x| x == m) {
+                out.push(m.to_string());
+            }
+        };
+        for m in self.catalog.for_kind(p.kind) {
+            push(&m.id);
         }
+        if let Some(TestState::Ok(list, _)) = self.tests.get(&p.id) {
+            for m in list {
+                push(m);
+            }
+        }
+        out
     }
 
     /// Set the model of a scope (`home`, `markdown`, ...); `None` = the default model.
@@ -270,6 +425,17 @@ impl AiState {
     /// Take in news from the running chat and tool; true when the screen has to be redrawn.
     pub fn pump(&mut self) -> bool {
         let mut changed = self.chat.pump();
+        for t in self.tests.values_mut() {
+            if let TestState::Running(rx) = t
+                && let Ok(r) = rx.try_recv()
+            {
+                changed = true;
+                *t = match r {
+                    Ok((list, note)) => TestState::Ok(list, note),
+                    Err(e) => TestState::Err(e),
+                };
+            }
+        }
         if let Some(run) = self.tool.as_mut()
             && let Some(job) = run.job.as_mut()
         {
@@ -300,7 +466,9 @@ impl AiState {
     }
 
     pub fn busy(&self) -> bool {
-        self.chat.running() || self.tool.as_ref().is_some_and(ToolRun::running)
+        self.tests.values().any(|t| matches!(t, TestState::Running(_)))
+            || self.chat.running()
+            || self.tool.as_ref().is_some_and(ToolRun::running)
     }
 }
 
@@ -354,8 +522,10 @@ mod tests {
     fn providers_can_be_added_and_removed_and_models_follow() {
         let d = tempfile::tempdir().unwrap();
         let (mut s, secrets) = state(d.path());
-        s.add_provider(ProviderKind::Ollama);
-        assert_eq!(s.selected, "ollama-2");
+        s.choose_kind(ProviderKind::Ollama);
+        assert_eq!(s.form.as_ref().unwrap().id, "ollama-2");
+        s.add_form_provider();
+        assert_eq!(s.screen, AiScreen::Edit(String::from("ollama-2")));
         s.set_scope_model("markdown", "ollama-2:llama3.2");
         s.set_default_model("ollama-2:llama3.2");
         s.draft.provider_mut("anthropic").unwrap().api_key = Some("k".into());

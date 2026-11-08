@@ -36,8 +36,10 @@ pub enum Page {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SettingsSection {
     General,
-    /// Glyphra AI: providers, keys and models.
-    Ai,
+    /// Glyphra AI: the providers and their keys.
+    AiProviders,
+    /// Glyphra AI: which model answers where.
+    AiModels,
     Keyboard,
     About,
     /// License Agreement: the MIT license.
@@ -47,9 +49,10 @@ pub enum SettingsSection {
 }
 
 impl SettingsSection {
-    pub const ALL: [SettingsSection; 6] = [
+    pub const ALL: [SettingsSection; 7] = [
         SettingsSection::General,
-        SettingsSection::Ai,
+        SettingsSection::AiProviders,
+        SettingsSection::AiModels,
         SettingsSection::Keyboard,
         SettingsSection::About,
         SettingsSection::LicenseMit,
@@ -59,7 +62,8 @@ impl SettingsSection {
     pub fn label(self) -> &'static str {
         match self {
             SettingsSection::General => "General",
-            SettingsSection::Ai => "AI",
+            SettingsSection::AiProviders => "AI providers",
+            SettingsSection::AiModels => "AI models",
             SettingsSection::Keyboard => "Keyboard",
             SettingsSection::About => "About",
             SettingsSection::LicenseMit => "License — MIT",
@@ -70,7 +74,8 @@ impl SettingsSection {
     pub fn id(self) -> &'static str {
         match self {
             SettingsSection::General => "general",
-            SettingsSection::Ai => "ai",
+            SettingsSection::AiProviders => "ai-providers",
+            SettingsSection::AiModels => "ai-models",
             SettingsSection::Keyboard => "keyboard",
             SettingsSection::About => "about",
             SettingsSection::LicenseMit => "license-mit",
@@ -281,7 +286,8 @@ pub fn bindable_commands() -> Vec<(Command, String)> {
         (Command::ShowPage(Page::Folder), "Show the Glyphra folder".into()),
         (Command::PinFolder, "Add a folder to the sidebar…".into()),
         (Command::OpenSettings(SettingsSection::General), "Settings".into()),
-        (Command::OpenSettings(SettingsSection::Ai), "AI settings".into()),
+        (Command::OpenSettings(SettingsSection::AiProviders), "AI providers".into()),
+        (Command::OpenSettings(SettingsSection::AiModels), "AI models".into()),
         (Command::OpenSettings(SettingsSection::Keyboard), "Keyboard shortcuts".into()),
         (Command::OpenSettings(SettingsSection::About), "About Glyphra".into()),
         (Command::OpenSettings(SettingsSection::LicenseMit), "License — MIT".into()),

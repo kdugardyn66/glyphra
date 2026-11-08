@@ -2202,7 +2202,7 @@ dependencies = [
 
 [[package]]
 name = "glyphra"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "dioxus",
  "glyphra-i18n",
@@ -2214,7 +2214,7 @@ dependencies = [
 
 [[package]]
 name = "glyphra-i18n"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "fluent-bundle",
  "fluent-syntax",
@@ -2226,7 +2226,7 @@ dependencies = [
 
 [[package]]
 name = "glyphra-shell"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "chrono",
  "dioxus",
@@ -2818,7 +2818,7 @@ dependencies = [
 
 [[package]]
 name = "kd-ai"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "base64 0.22.1",
  "log",
@@ -2832,14 +2832,14 @@ dependencies = [
 
 [[package]]
 name = "kd-commands"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "kd-store",
 ]
 
 [[package]]
 name = "kd-store"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "directories",
  "keyring",

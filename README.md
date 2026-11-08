@@ -2,7 +2,7 @@
 
 Markdown, PDF and Drawing in one workspace, with Glyphra AI and team collaboration on your own server.
 
-**Version 0.2.0** — Glyphra AI: an **AI Chat** page and an **AI Tools** page in the sidebar, and Settings › AI with providers (Anthropic, Gemini, OpenAI, Mistral, local Ollama and LM Studio, any OpenAI-compatible server, and more), models per part of the app and API keys in the system keychain. Before that: splash and start screen, native menu bar, four languages, settings with Apply/Close, documents in tabs or windows, all 18 Crafting Apps.
+**Version 0.2.1** — Glyphra AI (providers in Settings › AI providers by region, with Test connection; models in Settings › AI models): an **AI Chat** page and an **AI Tools** page in the sidebar, and Settings › AI with providers (Anthropic, Gemini, OpenAI, Mistral, local Ollama and LM Studio, any OpenAI-compatible server, and more), models per part of the app and API keys in the system keychain. Before that: splash and start screen, native menu bar, four languages, settings with Apply/Close, documents in tabs or windows, all 18 Crafting Apps.
 Editing arrives in 0.3.0; see the plan for the road to 1.0.0.
 
 ## Run
@@ -15,7 +15,7 @@ Linux needs `libwebkit2gtk-4.1-dev libgtk-3-dev libxdo-dev` (and a C compiler). 
 
 ## Glyphra AI
 
-Open **Settings › AI**, pick a provider, paste its API key and press Apply. Keys are stored in the system
+Open **Settings › AI providers**, pick a provider, paste its API key and press Apply. Keys are stored in the system
 keychain (macOS Keychain, Windows Credential Manager, Linux Secret Service such as GNOME Keyring or KWallet) and never
 in a file; `ai.toml` in the settings folder holds the rest. Without a keychain (a bare Linux session) the key lasts
 until Glyphra closes. Environment variables such as `ANTHROPIC_API_KEY` are used when no key is stored. Local servers

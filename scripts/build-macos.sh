@@ -87,17 +87,22 @@ mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN" "$APP/Contents/MacOS/$BIN_NAME"
 chmod +x "$APP/Contents/MacOS/$BIN_NAME"
 
-# Icon: rebuild the .icns from the 1024 px PNG when iconutil is available,
-# otherwise use the checked-in .icns.
-if command -v iconutil >/dev/null && command -v sips >/dev/null; then
-  ISET="$(mktemp -d)/$APP_NAME.iconset"
-  mkdir -p "$ISET"
+# Icon: rebuild the .icns from the 1024 px PNG when iconutil and sips can read it; if anything
+# in that goes wrong, use the checked-in .icns instead (never stop the build for an icon).
+build_icns() {
+  command -v iconutil >/dev/null && command -v sips >/dev/null || return 1
+  [ "$(sips -g pixelWidth "$ICONS/1024x1024.png" 2>/dev/null | awk '/pixelWidth/ {print $2}')" = "1024" ] || return 1
+  local iset
+  iset="$(mktemp -d)/$APP_NAME.iconset"
+  mkdir -p "$iset"
   for s in 16 32 128 256 512; do
-    sips -z $s $s "$ICONS/1024x1024.png" --out "$ISET/icon_${s}x${s}.png" >/dev/null
-    sips -z $((s * 2)) $((s * 2)) "$ICONS/1024x1024.png" --out "$ISET/icon_${s}x${s}@2x.png" >/dev/null
+    sips -z $s $s "$ICONS/1024x1024.png" --out "$iset/icon_${s}x${s}.png" >/dev/null 2>&1 || return 1
+    sips -z $((s * 2)) $((s * 2)) "$ICONS/1024x1024.png" --out "$iset/icon_${s}x${s}@2x.png" >/dev/null 2>&1 || return 1
   done
-  iconutil -c icns "$ISET" -o "$APP/Contents/Resources/$APP_NAME.icns"
-else
+  iconutil -c icns "$iset" -o "$APP/Contents/Resources/$APP_NAME.icns" >/dev/null 2>&1
+}
+if ! build_icns; then
+  echo "Note: could not rebuild the icon from 1024x1024.png; using apps/glyphra/icons/glyphra.icns"
   cp "$ICONS/glyphra.icns" "$APP/Contents/Resources/$APP_NAME.icns"
 fi
 

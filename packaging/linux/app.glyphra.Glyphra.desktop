@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=Glyphra
+GenericName=Markdown, PDF and Drawing
+Comment=Markdown, PDF and Drawing in one workspace, with Glyphra AI
+Exec=glyphra %F
+Icon=app.glyphra.Glyphra
+Terminal=false
+Categories=Office;TextEditor;Development;
+Keywords=markdown;pdf;drawing;writing;editor;ai;
+MimeType=text/markdown;
+StartupWMClass=glyphra

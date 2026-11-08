@@ -1,0 +1,19 @@
+# Optional: `dx bundle --release --package glyphra` also makes a bundle from this file. The
+# supported way to package is ./build.sh (scripts/build-{macos,linux}.sh, build-windows.ps1),
+# which does not need dioxus-cli and shares the identifier below. Keep both in step.
+
+[application]
+name = "Glyphra"
+
+[bundle]
+identifier = "app.glyphra.Glyphra"   # placeholder until the domain is registered
+publisher = "Glyphra"
+short_description = "Markdown, PDF and Drawing in one workspace"
+long_description = "Glyphra is a workspace for technical writing: Markdown, PDF and Drawing, with Glyphra AI and team collaboration on your own server."
+category = "Productivity"
+icon = ["icons/32x32.png", "icons/128x128.png", "icons/256x256.png", "icons/512x512.png", "icons/1024x1024.png"]
+
+[bundle.macos]
+minimum_system_version = "11.0"
+# "-" is an ad-hoc signature: it runs on the Mac that built it. Use a Developer ID to distribute.
+signing_identity = "-"

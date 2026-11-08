@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>app.glyphra.Glyphra</id>
+  <name>Glyphra</name>
+  <summary>Markdown, PDF and Drawing in one workspace, with Glyphra AI</summary>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT OR Apache-2.0</project_license>
+  <developer id="app.glyphra">
+    <name>Kris Dugardyn</name>
+  </developer>
+  <description>
+    <p>Glyphra is a workspace for technical writing: Markdown, PDF and Drawing, with Glyphra AI
+    and team collaboration on your own server. It works on its own on your computer.</p>
+  </description>
+  <launchable type="desktop-id">app.glyphra.Glyphra.desktop</launchable>
+  <url type="homepage">https://github.com/kdugardyn66/glyphra</url>
+  <categories>
+    <category>Office</category>
+    <category>TextEditor</category>
+  </categories>
+  <content_rating type="oars-1.1"/>
+  <releases>
+    <release version="@VERSION@" date="@DATE@"/>
+  </releases>
+</component>

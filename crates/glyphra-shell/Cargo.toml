@@ -1,0 +1,25 @@
+[package]
+name = "glyphra-shell"
+description = "Glyphra's window: splash, start screen, tabs, settings and the command dispatcher (Dioxus components)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+kd-commands.workspace = true
+kd-store.workspace = true
+glyphra-i18n.workspace = true
+dioxus = { version = "0.7", features = ["desktop"] }
+tokio = { version = "1", features = ["rt", "time"] }
+serde_json.workspace = true
+pulldown-cmark = { version = "0.13", default-features = false, features = ["html"] }
+sys-locale = "0.3"
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+open = "5"
+trash = "5"
+rfd = "0.15"
+
+[dev-dependencies]
+tempfile.workspace = true

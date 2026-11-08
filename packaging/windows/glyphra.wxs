@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Glyphra MSI (WiX v4+). Built by scripts/build-windows.ps1 -Msi with:
+    wix build -arch x64 -d Version=… -d Exe=… -d Icon=… -d License=… -o Glyphra.msi glyphra.wxs
+  It installs Glyphra.exe into Program Files\Glyphra.
+  Keep UpgradeCode fixed forever: it is how Windows recognises an upgrade.
+-->
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs" xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui">
+  <Package Name="Glyphra"
+           Manufacturer="Kris Dugardyn"
+           Version="$(var.Version)"
+           UpgradeCode="6E2F9A14-3B7D-4C58-9A61-D05E8B7C2F43"
+           Scope="perMachine"
+           Compressed="yes">
+    <MajorUpgrade DowngradeErrorMessage="A newer version of Glyphra is already installed." />
+    <MediaTemplate EmbedCab="yes" />
+
+    <Icon Id="AppIcon" SourceFile="$(var.Icon)" />
+    <Property Id="ARPPRODUCTICON" Value="AppIcon" />
+    <Property Id="ARPURLINFOABOUT" Value="https://github.com/kdugardyn66/glyphra" />
+    <WixVariable Id="WixUILicenseRtf" Value="$(var.License)" />
+
+    <StandardDirectory Id="ProgramFiles64Folder">
+      <Directory Id="INSTALLFOLDER" Name="Glyphra">
+        <Component Id="MainExecutable">
+          <File Id="GlyphraExe" Source="$(var.Exe)" Name="Glyphra.exe" KeyPath="yes">
+            <Shortcut Id="StartMenuShortcut" Directory="ProgramMenuFolder" Name="Glyphra"
+                      Description="Markdown, PDF and Drawing in one workspace"
+                      WorkingDirectory="INSTALLFOLDER" Icon="AppIcon" Advertise="yes" />
+          </File>
+        </Component>
+      </Directory>
+    </StandardDirectory>
+    <StandardDirectory Id="ProgramMenuFolder" />
+
+    <Feature Id="Main" Title="Glyphra">
+      <ComponentRef Id="MainExecutable" />
+    </Feature>
+
+    <ui:WixUI Id="WixUI_Minimal" />
+  </Package>
+</Wix>

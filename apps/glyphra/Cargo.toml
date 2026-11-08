@@ -1,0 +1,16 @@
+[package]
+name = "glyphra"
+description = "Glyphra: Markdown, PDF and Drawing with Glyphra AI and team collaboration"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+glyphra-shell.workspace = true
+glyphra-i18n.workspace = true
+kd-commands.workspace = true
+kd-store.workspace = true
+dioxus = { version = "0.7", features = ["desktop"] }
+sys-locale = "0.3"

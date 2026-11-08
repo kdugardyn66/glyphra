@@ -1,11 +1,12 @@
 //! The Settings dialog: General, Keyboard, About and the licences.
 
+use crate::app::run_effect;
 use crate::icons::Icon;
-use crate::model::AppModel;
+use crate::model::{AppModel, Effect};
 use dioxus::prelude::*;
 use glyphra_i18n::Direction;
 use kd_commands::{Command, Keymap, Os, SettingsSection, bindable_commands, display_sequence};
-use kd_store::{SOURCE_REPO, ThemePref, VERSION};
+use kd_store::{OpenIn, SOURCE_REPO, Store, ThemePref, VERSION};
 
 const MIT: &str = include_str!("../../../LICENSE-MIT");
 const APACHE: &str = include_str!("../../../LICENSE-APACHE");
@@ -19,15 +20,20 @@ pub fn SettingsDialog() -> Element {
     let items: Vec<(SettingsSection, String)> =
         SettingsSection::ALL.into_iter().map(|s| (s, m.t(&format!("settings-{}", s.id())))).collect();
     let heading = m.t(&format!("settings-{}", section.id()));
+    let (l_apply, l_close) = (m.t("settings-apply"), m.t("settings-close"));
+    let dirty = m.settings_dirty();
     drop(m);
+    // The dialog is modal: the scrim swallows clicks (it does not close the dialog) and only
+    // Apply, Close or Escape leave it.
     rsx! {
-        div { class: "scrim", onclick: move |_| model.write().settings = None,
+        div { class: "scrim", onclick: move |e| e.stop_propagation(),
             div {
                 class: "settings",
+                tabindex: "0",
                 onclick: move |e| e.stop_propagation(),
                 onkeydown: move |e| {
                     if e.key() == Key::Escape {
-                        model.write().settings = None;
+                        model.write().close_settings();
                     }
                 },
                 div { class: "nav-col",
@@ -36,19 +42,35 @@ pub fn SettingsDialog() -> Element {
                         button {
                             key: "{s.id()}",
                             class: if s == section { "nav active" } else { "nav" },
-                            onclick: move |_| model.write().settings = Some(s),
+                            onclick: move |_| model.write().open_settings(s),
                             span { class: "t", "{label}" }
                         }
                     }
                 }
                 div { class: "pane",
-                    h2 { "{heading}" }
-                    match section {
-                        SettingsSection::General => rsx! { General {} },
-                        SettingsSection::Keyboard => rsx! { KeyboardPane {} },
-                        SettingsSection::About => rsx! { About {} },
-                        SettingsSection::LicenseMit => rsx! { div { class: "license selectable", "{MIT}" } },
-                        SettingsSection::LicenseApache => rsx! { div { class: "license selectable", "{APACHE}" } },
+                    div { class: "pane-body",
+                        h2 { "{heading}" }
+                        match section {
+                            SettingsSection::General => rsx! { General {} },
+                            SettingsSection::Keyboard => rsx! { KeyboardPane {} },
+                            SettingsSection::About => rsx! { About {} },
+                            SettingsSection::LicenseMit => rsx! { div { class: "license selectable", "{MIT}" } },
+                            SettingsSection::LicenseApache => rsx! { div { class: "license selectable", "{APACHE}" } },
+                        }
+                    }
+                    div { class: "foot",
+                        button {
+                            class: "btn primary",
+                            disabled: !dirty,
+                            onclick: move |_| {
+                                let ok = model.write().apply_settings();
+                                if ok {
+                                    model.write().close_settings();
+                                }
+                            },
+                            "{l_apply}"
+                        }
+                        button { class: "btn", onclick: move |_| model.write().close_settings(), "{l_close}" }
                     }
                 }
             }
@@ -60,9 +82,14 @@ pub fn SettingsDialog() -> Element {
 fn General() -> Element {
     let mut model = use_context::<Signal<AppModel>>();
     let m = model.read();
-    let s = &m.state.settings;
-    let (name, theme, language, docs) = (s.display_name.clone(), s.theme, s.language.clone(), s.documents_dir.display().to_string());
+    let s = &m.draft;
+    let (name, theme, language, docs, open_in) =
+        (s.display_name.clone(), s.theme, s.language.clone(), s.documents_dir.display().to_string(), s.open_files_in);
+    let is_default = s.documents_dir == Store::default_documents_dir();
     let t = |id: &str| m.t(id);
+    let (l_choose, l_default, n_docs, l_open, n_open) =
+        (t("settings-docs-choose"), t("settings-docs-default"), t("settings-docs-note"), t("settings-open-in"), t("settings-open-note"));
+    let opens: Vec<(OpenIn, String)> = vec![(OpenIn::Tab, t("settings-open-tabs")), (OpenIn::Window, t("settings-open-windows"))];
     let (l_name, n_name, l_theme, l_lang, n_lang, l_docs, sys_default) = (
         t("settings-name"),
         t("settings-name-note"),
@@ -84,14 +111,14 @@ fn General() -> Element {
     rsx! {
         div { class: "field",
             label { "{l_name}" }
-            input { r#type: "text", value: "{name}", oninput: move |e| model.write().set_display_name(e.value()) }
+            input { r#type: "text", value: "{name}", oninput: move |e| model.write().draft.display_name = e.value() }
             span { class: "note", "{n_name}" }
         }
         div { class: "field",
             label { "{l_theme}" }
             div { class: "seg",
                 for (pref , label , icon) in themes {
-                    button { key: "{label}", class: if theme == pref { "on" } else { "" }, onclick: move |_| model.write().choose_theme(pref),
+                    button { key: "{label}", class: if theme == pref { "on" } else { "" }, onclick: move |_| model.write().draft.theme = pref,
                         span { style: "display:inline-flex;align-items:center;gap:6px", Icon { name: icon, size: 15 } "{label}" }
                     }
                 }
@@ -99,7 +126,7 @@ fn General() -> Element {
         }
         div { class: "field",
             label { "{l_lang}" }
-            select { value: "{language}", onchange: move |e| model.write().choose_language(&e.value()),
+            select { value: "{language}", onchange: move |e| model.write().draft.language = e.value(),
                 option { value: "", selected: language.is_empty(), "{sys_default}" }
                 for l in locales {
                     option { key: "{l.tag}", value: "{l.tag}", selected: language == l.tag, "{l.native_name}" }
@@ -109,7 +136,31 @@ fn General() -> Element {
         }
         div { class: "field",
             label { "{l_docs}" }
-            span { class: "selectable", "{docs}" }
+            div { class: "pathrow",
+                span { class: "path selectable", title: "{docs}", "{docs}" }
+                button { class: "btn", onclick: move |_| run_effect(model, Effect::PickDocumentsFolderDialog), "{l_choose}" }
+                button {
+                    class: "btn",
+                    disabled: is_default,
+                    onclick: move |_| model.write().draft_documents_dir(Store::default_documents_dir()),
+                    "{l_default}"
+                }
+            }
+            span { class: "note", "{n_docs}" }
+        }
+        div { class: "field",
+            label { "{l_open}" }
+            div { class: "seg",
+                for (choice , label) in opens {
+                    button {
+                        key: "{label}",
+                        class: if open_in == choice { "on" } else { "" },
+                        onclick: move |_| model.write().draft.open_files_in = choice,
+                        "{label}"
+                    }
+                }
+            }
+            span { class: "note", "{n_open}" }
         }
     }
 }

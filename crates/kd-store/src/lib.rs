@@ -4,6 +4,7 @@
 //! (SQLite), user settings (`home.json`) and file helpers. This crate never depends on a
 //! UI toolkit, so the CLI and the server can reuse it.
 
+pub mod appicon;
 pub mod craft;
 pub mod db;
 pub mod doctype;

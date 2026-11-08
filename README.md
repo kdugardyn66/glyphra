@@ -2,7 +2,7 @@
 
 Markdown, PDF and Drawing in one workspace, with Glyphra AI and team collaboration on your own server.
 
-**Version 0.1.0** — splash screen, start screen, native menu bar, four languages.
+**Version 0.1.1** — splash screen, start screen, native menu bar, four languages; settings with Apply/Close, a changeable documents folder, documents in tabs or windows, the icons of installed apps.
 Editing arrives in 0.3.0; see the plan for the road to 1.0.0.
 
 ## Run

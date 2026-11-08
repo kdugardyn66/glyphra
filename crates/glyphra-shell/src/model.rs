@@ -9,9 +9,10 @@ use crate::preview;
 use glyphra_i18n::{Arg, Catalog, I18n};
 use kd_commands::{Command, Page, SettingsSection};
 use kd_store::{
-    DocGroup, DocKind, FileEntry, HomeState, InstalledApp, ModuleKind, Opener, Store, ThemePref, create_folder, create_new_document,
-    detect_installed, duplicate_file, list_documents, list_subfolders, now, rename_file, rename_folder,
+    DocGroup, DocKind, FileEntry, HomeState, InstalledApp, ModuleKind, OpenIn, Opener, Settings, Store, ThemePref, create_folder,
+    create_new_document, detect_installed, duplicate_file, list_documents, list_subfolders, now, rename_file, rename_folder,
 };
+use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -34,6 +35,10 @@ pub enum Effect {
         file: Option<PathBuf>,
     },
     FocusSearch,
+    /// Show the folder dialog for the documents folder; the answer goes to [`AppModel::draft_documents_dir`].
+    PickDocumentsFolderDialog,
+    /// Open a document in a window of its own (or bring that window forward).
+    OpenInWindow(PathBuf),
 }
 
 /// What a tab shows.
@@ -133,6 +138,13 @@ pub struct AppModel {
     pub installed: Vec<InstalledApp>,
     pub modal: Option<Modal>,
     pub settings: Option<SettingsSection>,
+    /// The settings being edited in the dialog; only [`AppModel::apply_settings`] makes them real.
+    pub draft: Settings,
+    /// `data:` URIs of the icons of installed Crafting Apps, by app id.
+    pub app_icons: HashMap<String, String>,
+    /// This is a document window: documents open in its own tab, never in another window,
+    /// and nothing is written to the settings or the library.
+    pub detached: bool,
     pub toast: Option<Toast>,
     toast_seq: u64,
     /// Bumped whenever files may have changed, so views re-read the disk.
@@ -187,6 +199,9 @@ impl AppModel {
             sort: Sort { key: SortKey::Modified, ascending: false },
             modal: None,
             settings: None,
+            draft: Settings::with_documents_dir(PathBuf::new()),
+            app_icons: HashMap::new(),
+            detached: false,
             toast: None,
             toast_seq: 0,
             revision: 0,
@@ -197,7 +212,32 @@ impl AppModel {
     pub fn load(store: Store, catalog: Catalog, system_language: String) -> AppModel {
         let (state, _first) = store.load_or_init();
         let i18n = I18n::new(&catalog, &state.settings.language, &system_language);
-        Self::assemble(store, state, catalog, i18n, system_language, detect_installed())
+        let mut m = Self::assemble(store, state, catalog, i18n, system_language, detect_installed());
+        m.load_app_icons();
+        m
+    }
+
+    /// Read the icons of the installed Crafting Apps (see [`kd_store::appicon`]).
+    fn load_app_icons(&mut self) {
+        let cache = self.store.dir().join("icon-cache");
+        self.app_icons = self
+            .installed
+            .iter()
+            .filter_map(|i| kd_store::appicon::icon_data_uri(i, &cache).map(|uri| (i.app.id.to_string(), uri)))
+            .collect();
+    }
+
+    /// A model for a document window: the settings and language of the main window, one
+    /// document in a tab, no writes.
+    pub fn for_document_window(path: &Path, system_language: String) -> AppModel {
+        let store = Store::platform();
+        let (catalog, _) = Catalog::load(Some(&store.locales_dir()));
+        let (state, _) = store.load_or_init();
+        let i18n = I18n::new(&catalog, &state.settings.language, &system_language);
+        let mut m = Self::assemble(store, state, catalog, i18n, system_language, Vec::new());
+        m.detached = true;
+        let _ = m.open_path(path);
+        m
     }
 
     // ------------------------------------------------------------------ small helpers
@@ -386,6 +426,11 @@ impl AppModel {
             self.persist();
             return Vec::new();
         }
+        if !self.detached && self.state.settings.open_files_in == OpenIn::Window {
+            self.state.library.touch(path, now());
+            self.persist();
+            return vec![Effect::OpenInWindow(path.to_path_buf())];
+        }
         // already open: switch to it
         if let Some(i) = self.tabs.iter().position(|t| t.path.as_deref() == Some(path)) {
             self.active = i;
@@ -394,8 +439,10 @@ impl AppModel {
             self.tabs.push(tab);
             self.active = self.tabs.len() - 1;
         }
-        self.state.library.touch(path, now());
-        self.persist();
+        if !self.detached {
+            self.state.library.touch(path, now());
+            self.persist();
+        }
         Vec::new()
     }
 
@@ -453,6 +500,10 @@ impl AppModel {
 
     /// Run a command.
     pub fn dispatch(&mut self, cmd: Command) -> Vec<Effect> {
+        // The settings dialog is modal: until it is closed, everything else is ignored.
+        if self.settings.is_some() && !matches!(cmd, Command::OpenSettings(_) | Command::Quit) {
+            return Vec::new();
+        }
         match cmd {
             Command::NewDocumentPicker => {
                 self.go_home();
@@ -514,7 +565,7 @@ impl AppModel {
                 };
                 self.revision += 1;
             }
-            Command::OpenSettings(section) => self.settings = Some(section),
+            Command::OpenSettings(section) => self.open_settings(section),
             Command::LaunchCraft(id) => return vec![Effect::LaunchCraft { id, file: None }],
             Command::ActivateTab(i) => {
                 if i < self.tabs.len() {
@@ -552,6 +603,7 @@ impl AppModel {
             Command::OpenUrl(u) => return vec![Effect::OpenUrl(u)],
             Command::Refresh => {
                 self.installed = detect_installed();
+                self.load_app_icons();
                 self.state.library.prune_starred();
                 self.revision += 1;
             }
@@ -670,19 +722,67 @@ impl AppModel {
 
     // ------------------------------------------------------------------ settings
 
-    pub fn set_display_name(&mut self, name: String) {
-        self.state.settings.display_name = name;
-        self.persist();
+    /// Show the dialog (or another section of it). Opening it starts a fresh draft.
+    pub fn open_settings(&mut self, section: SettingsSection) {
+        if self.settings.is_none() {
+            self.draft = self.state.settings.clone();
+        }
+        self.settings = Some(section);
     }
 
-    pub fn choose_language(&mut self, tag: &str) {
-        self.set_language(tag);
-        self.persist();
+    /// Close the dialog and drop what was not applied.
+    pub fn close_settings(&mut self) {
+        self.settings = None;
+        self.draft = self.state.settings.clone();
     }
 
-    pub fn choose_theme(&mut self, theme: ThemePref) {
-        self.state.settings.theme = theme;
+    /// The editable settings as one comparable value.
+    fn editable(s: &Settings) -> (&str, ThemePref, &str, &Path, OpenIn) {
+        (&s.display_name, s.theme, &s.language, &s.documents_dir, s.open_files_in)
+    }
+
+    /// Has anything been changed in the dialog (is Apply useful)?
+    pub fn settings_dirty(&self) -> bool {
+        Self::editable(&self.draft) != Self::editable(&self.state.settings)
+    }
+
+    /// Make the draft real: save it, switch language and theme, create the documents folder.
+    /// Returns false (dialog stays open, an error is shown) when the folder cannot be made.
+    pub fn apply_settings(&mut self) -> bool {
+        if !self.settings_dirty() {
+            return true;
+        }
+        let d = self.draft.clone();
+        if d.documents_dir.as_os_str().is_empty() {
+            self.fail("error-docs-folder", "");
+            return false;
+        }
+        if d.documents_dir != self.state.settings.documents_dir
+            && let Err(e) = fs::create_dir_all(&d.documents_dir)
+        {
+            self.fail("error-docs-folder", &e.to_string());
+            return false;
+        }
+        let old_docs = std::mem::replace(&mut self.state.settings.documents_dir, d.documents_dir.clone());
+        if self.folder == old_docs {
+            self.folder = d.documents_dir.clone();
+        }
+        let s = &mut self.state.settings;
+        s.display_name = d.display_name.trim().to_string();
+        s.theme = d.theme;
+        s.open_files_in = d.open_files_in;
+        s.open_modules_in = d.open_files_in;
+        if s.language != d.language {
+            self.set_language(&d.language);
+        }
+        self.draft = self.state.settings.clone();
+        self.revision += 1;
         self.persist();
+        true
+    }
+
+    pub fn draft_documents_dir(&mut self, dir: PathBuf) {
+        self.draft.documents_dir = dir;
     }
 
     pub fn dismiss_toast(&mut self, id: u64) {
@@ -926,6 +1026,99 @@ mod tests {
         assert_eq!(m.folder_roots().len(), 1);
     }
 
+    fn choose_language(m: &mut AppModel, tag: &str) {
+        m.open_settings(SettingsSection::General);
+        m.draft.language = tag.to_string();
+        assert!(m.apply_settings());
+        m.close_settings();
+    }
+
+    #[test]
+    fn settings_apply_only_when_changed_and_close_discards() {
+        let tmp = tempfile::tempdir().unwrap();
+        let mut m = model(tmp.path());
+        m.open_settings(SettingsSection::General);
+        assert!(!m.settings_dirty(), "nothing changed: Apply stays grey");
+        m.draft.theme = ThemePref::Dark;
+        m.draft.open_files_in = OpenIn::Window;
+        assert!(m.settings_dirty());
+        assert_eq!(m.state.settings.theme, ThemePref::System, "not real before Apply");
+        m.close_settings();
+        assert!(m.settings.is_none());
+        assert_eq!(m.state.settings.theme, ThemePref::System, "Close throws the draft away");
+        m.open_settings(SettingsSection::General);
+        assert!(!m.settings_dirty(), "a new draft starts clean");
+        m.draft.theme = ThemePref::Dark;
+        m.draft.open_files_in = OpenIn::Window;
+        assert!(m.apply_settings());
+        assert!(!m.settings_dirty());
+        assert_eq!(m.state.settings.theme, ThemePref::Dark);
+        assert_eq!(m.state.settings.open_modules_in, OpenIn::Window);
+        let (again, _) = Store::at(tmp.path().join("cfg")).load_or_init();
+        assert_eq!(again.settings.open_files_in, OpenIn::Window);
+    }
+
+    #[test]
+    fn the_documents_folder_can_be_changed() {
+        let tmp = tempfile::tempdir().unwrap();
+        let mut m = model(tmp.path());
+        let new = tmp.path().join("elsewhere/notes");
+        m.open_settings(SettingsSection::General);
+        m.draft_documents_dir(new.clone());
+        assert!(m.settings_dirty());
+        assert!(m.apply_settings());
+        assert!(new.is_dir(), "the folder is created");
+        assert_eq!(m.state.settings.documents_dir, new);
+        // new documents land there
+        m.close_settings();
+        m.dispatch(Command::NewDocument(ModuleKind::Markdown));
+        assert!(m.tabs.last().and_then(|t| t.path.as_deref()).is_some_and(|p| p.starts_with(&new)));
+        // a folder that cannot be made keeps the dialog's draft and reports an error
+        m.open_settings(SettingsSection::General);
+        let file = tmp.path().join("a-file");
+        fs::write(&file, "x").unwrap();
+        m.draft_documents_dir(file.join("sub"));
+        assert!(!m.apply_settings());
+        assert!(m.toast.as_ref().is_some_and(|t| t.error));
+        assert_eq!(m.state.settings.documents_dir, new);
+    }
+
+    #[test]
+    fn the_settings_dialog_blocks_everything_else() {
+        let tmp = tempfile::tempdir().unwrap();
+        let mut m = model(tmp.path());
+        m.dispatch(Command::OpenSettings(SettingsSection::General));
+        assert!(m.dispatch(Command::OpenDialog).is_empty());
+        assert!(m.dispatch(Command::NewDocument(ModuleKind::Markdown)).is_empty());
+        m.dispatch(Command::NewDocumentPicker);
+        assert_eq!(m.page, Page::Home);
+        assert_eq!(m.tabs.len(), 1);
+        assert_eq!(m.dispatch(Command::Quit), vec![Effect::Quit]);
+        m.dispatch(Command::OpenSettings(SettingsSection::About));
+        assert_eq!(m.settings, Some(SettingsSection::About));
+        m.close_settings();
+        assert_eq!(m.dispatch(Command::OpenDialog), vec![Effect::OpenFileDialog]);
+    }
+
+    #[test]
+    fn documents_open_in_a_window_when_chosen() {
+        let tmp = tempfile::tempdir().unwrap();
+        let mut m = model(tmp.path());
+        let doc = tmp.path().join("a.md");
+        fs::write(&doc, "# a").unwrap();
+        assert!(m.dispatch(Command::OpenPath(doc.clone())).is_empty(), "tabs by default");
+        assert_eq!(m.tabs.len(), 2);
+        m.state.settings.open_files_in = OpenIn::Window;
+        let b = tmp.path().join("b.md");
+        fs::write(&b, "# b").unwrap();
+        assert_eq!(m.dispatch(Command::OpenPath(b.clone())), vec![Effect::OpenInWindow(b.clone())]);
+        assert_eq!(m.tabs.len(), 2, "no tab for it");
+        // a document window itself always uses its own tab
+        m.detached = true;
+        assert!(m.dispatch(Command::OpenPath(b)).is_empty());
+        assert_eq!(m.tabs.len(), 3);
+    }
+
     #[test]
     fn theme_and_language_are_saved() {
         let tmp = tempfile::tempdir().unwrap();
@@ -933,7 +1126,7 @@ mod tests {
         m.dispatch(Command::CycleTheme);
         assert_eq!(m.state.settings.theme, ThemePref::Light);
         m.dispatch(Command::SetTheme(ThemePref::Dark));
-        m.choose_language("nl");
+        choose_language(&mut m, "nl");
         assert_eq!(m.t("menu-file"), "Bestand");
         let (again, _) = Store::at(tmp.path().join("cfg")).load_or_init();
         assert_eq!(again.settings.theme, ThemePref::Dark);
@@ -947,9 +1140,9 @@ mod tests {
         assert_eq!(m.when_at(1000, 1030), "just now");
         assert_eq!(m.when_at(1000, 1000 + 5 * 60), "5 min ago");
         assert_eq!(m.when_at(0, 5), "—");
-        m.choose_language("fr");
+        choose_language(&mut m, "fr");
         assert_eq!(m.when_at(1000, 1000 + 86_400), "hier");
-        m.choose_language("de");
+        choose_language(&mut m, "de");
         assert_eq!(m.when_at(1000, 1000 + 3 * 86_400), "vor 3 Tagen");
     }
 

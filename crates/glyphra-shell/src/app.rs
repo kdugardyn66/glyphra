@@ -6,7 +6,10 @@ use dioxus::prelude::*;
 use glyphra_i18n::Catalog;
 use kd_commands::{Command, menu::command_for_menu_id};
 use kd_store::{ThemePref, VERSION};
-use std::path::Path;
+use std::cell::RefCell;
+use std::collections::HashMap;
+use std::path::{Path, PathBuf};
+use std::rc::{Rc, Weak};
 use std::time::{Duration, Instant};
 
 /// The splash stays at least this long, so it does not flash by.
@@ -112,10 +115,89 @@ fn exec(mut model: Signal<AppModel>, effect: Effect) {
                 None => model.write().notify("toast-craft-missing"),
             }
         }
+        Effect::PickDocumentsFolderDialog => {
+            spawn(async move {
+                if let Some(dir) = rfd::AsyncFileDialog::new().pick_folder().await {
+                    model.write().draft_documents_dir(dir.path().to_path_buf());
+                }
+            });
+        }
+        Effect::OpenInWindow(path) => open_window(path),
         Effect::FocusSearch => {
             document::eval("setTimeout(() => document.getElementById('search')?.focus(), 30)");
         }
     }
+}
+
+thread_local! {
+    /// Document windows that are open, by file, so a second open brings the window forward.
+    static WINDOWS: RefCell<HashMap<PathBuf, Weak<dioxus::desktop::DesktopService>>> = RefCell::new(HashMap::new());
+}
+
+/// Open a document in a window of its own, or bring its window to the front.
+fn open_window(path: PathBuf) {
+    let existing = WINDOWS.with(|w| w.borrow().get(&path).and_then(Weak::upgrade));
+    if let Some(w) = existing {
+        w.window.set_focus();
+        return;
+    }
+    let title = path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_else(|| "Glyphra".into());
+    let window = dioxus::desktop::WindowBuilder::new()
+        .with_title(title)
+        .with_inner_size(dioxus::desktop::LogicalSize::new(1000.0, 760.0))
+        .with_min_inner_size(dioxus::desktop::LogicalSize::new(560.0, 400.0));
+    let config = dioxus::desktop::Config::new()
+        .with_window(window)
+        .with_menu(None::<dioxus::desktop::muda::Menu>)
+        .with_background_color((23, 24, 27, 255));
+    let dom = VirtualDom::new_with_props(DocWindow, DocWindowProps { path: path.clone() });
+    let desktop: Rc<dioxus::desktop::DesktopService> = dioxus::desktop::window();
+    spawn(async move {
+        let handle = desktop.new_window(dom, config).await;
+        WINDOWS.with(|w| {
+            let mut w = w.borrow_mut();
+            w.retain(|_, v| v.strong_count() > 0);
+            w.insert(path, Rc::downgrade(&handle));
+        });
+    });
+}
+
+/// The window of one document: its own model (same settings and language), no tabs, no sidebar.
+#[component]
+pub fn DocWindow(path: PathBuf) -> Element {
+    let model = use_context_provider(|| Signal::new(AppModel::for_document_window(&path, system_language())));
+    let loaded = model.read().tabs.len() > 1;
+    use_effect(move || {
+        if !loaded {
+            dioxus::desktop::window().close();
+        }
+    });
+    let (theme, dir, style) = look(&model.read());
+    let toast = model.read().toast.clone();
+    rsx! {
+        style { dangerous_inner_html: crate::CSS }
+        div { class: "app", "data-theme": "{theme}", dir: "{dir}", style: "{style}",
+            if loaded {
+                div { class: "body", doc::DocTab {} }
+            }
+            modal::Dialogs {}
+            if let Some(t) = toast {
+                modal::ToastView { id: t.id, text: t.text, error: t.error }
+            }
+        }
+    }
+}
+
+/// Theme, text direction and font of the window, from the settings and the language.
+fn look(m: &AppModel) -> (&'static str, &'static str, String) {
+    let theme = match m.state.settings.theme {
+        ThemePref::System => "system",
+        ThemePref::Light => "light",
+        ThemePref::Dark => "dark",
+    };
+    let info = m.i18n.info();
+    let font = info.font.clone().unwrap_or_default();
+    (theme, info.direction.html(), if font.is_empty() { String::new() } else { format!("font-family:{font}") })
 }
 
 fn reveal(p: &Path) {
@@ -180,17 +262,7 @@ pub fn Root() -> Element {
         }
     });
 
-    let (theme, dir, font) = {
-        let m = model.read();
-        let theme = match m.state.settings.theme {
-            ThemePref::System => "system",
-            ThemePref::Light => "light",
-            ThemePref::Dark => "dark",
-        };
-        let info = m.i18n.info();
-        (theme, info.direction.html(), info.font.clone().unwrap_or_default())
-    };
-    let style = if font.is_empty() { String::new() } else { format!("font-family:{font}") };
+    let (theme, dir, style) = look(&model.read());
     let phase_now = phase();
 
     rsx! {

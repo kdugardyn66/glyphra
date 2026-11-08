@@ -191,7 +191,15 @@ h1.greet { font-size: 34px; font-weight: 400; margin: 0 0 8px; letter-spacing: -
 .settings { width: min(860px, 94vw); height: min(600px, 86vh); border-radius: 14px; background: var(--surface); border: 1px solid var(--border-strong); box-shadow: var(--shadow); display: flex; overflow: hidden; }
 .settings .nav-col { width: 210px; flex: none; background: var(--chrome); border-inline-end: 1px solid var(--border); padding: 18px 10px; display: flex; flex-direction: column; gap: 2px; }
 .settings .nav-col h3 { margin: 0 10px 12px; font-size: 16px; font-weight: 600; }
-.settings .pane { flex: 1; overflow-y: auto; padding: 26px 30px; }
+.settings .pane { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.settings .pane-body { flex: 1; overflow-y: auto; padding: 26px 30px; }
+.settings .foot { flex: none; display: flex; justify-content: flex-end; gap: 10px; padding: 14px 30px; border-top: 1px solid var(--border); background: var(--chrome); }
+.btn:disabled { opacity: .45; cursor: default; background: var(--surface); border-color: var(--border); color: var(--text-faint); }
+.btn.primary:disabled { background: var(--border); border-color: var(--border); }
+.pathrow { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.pathrow .path { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; direction: ltr; unicode-bidi: isolate; text-align: start; }
+.app-tile .ai.img { background: transparent !important; }
+.app-tile .ai img { width: 40px; height: 40px; object-fit: contain; border-radius: 9px; }
 .settings .pane h2 { font-weight: 500; font-size: 22px; margin: 0 0 20px; }
 .field { display: grid; grid-template-columns: 200px 1fr; gap: 6px 20px; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--border); }
 .field label { color: var(--text-muted); }

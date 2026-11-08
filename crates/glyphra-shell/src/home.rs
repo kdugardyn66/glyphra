@@ -96,6 +96,11 @@ fn StartNew(into: Option<String>) -> Element {
     }
 }
 
+/// id, name, purpose, badge, location, icon
+type InstalledTile = (String, &'static str, &'static str, &'static str, String, Option<String>);
+/// id, name, purpose, badge, installed, icon
+type CatalogTile = (String, &'static str, &'static str, &'static str, bool, Option<String>);
+
 #[component]
 fn AppsStrip() -> Element {
     let model = use_context::<Signal<AppModel>>();
@@ -106,8 +111,11 @@ fn AppsStrip() -> Element {
     let sub =
         if n == 0 { m.t("apps-subtitle-none") } else { m.t_args("apps-subtitle", &[("n", n.into()), ("total", CRAFT_APPS.len().into())]) };
     let empty = m.t("apps-empty");
-    let tiles: Vec<(String, &'static str, &'static str, &'static str, String)> =
-        m.installed.iter().map(|i| (i.app.id.to_string(), i.app.name, i.app.purpose, i.app.badge, i.location())).collect();
+    let tiles: Vec<InstalledTile> = m
+        .installed
+        .iter()
+        .map(|i| (i.app.id.to_string(), i.app.name, i.app.purpose, i.app.badge, i.location(), m.app_icons.get(i.app.id).cloned()))
+        .collect();
     drop(m);
     rsx! {
         div { class: "section",
@@ -122,13 +130,13 @@ fn AppsStrip() -> Element {
                 div { class: "empty", "{empty}" }
             } else {
                 div { class: "apps",
-                    for (id, name, purpose, badge, place) in tiles {
+                    for (id, name, purpose, badge, place, icon) in tiles {
                         button {
                             key: "{id}",
                             class: "app-tile",
                             title: "{place}",
                             onclick: move |_| run(model, Command::LaunchCraft(id.clone())),
-                            div { class: "ai", style: "background:var(--accent)", "{badge}" }
+                            AppIcon { icon: icon.clone(), badge, name }
                             div { class: "tx",
                                 div { class: "nm", "{name}" }
                                 div { class: "pp", "{purpose}" }
@@ -205,20 +213,39 @@ fn NewPage() -> Element {
     }
 }
 
+/// An app's own icon when it could be read from the install, else its coloured badge.
+#[component]
+fn AppIcon(icon: Option<String>, badge: &'static str, name: &'static str) -> Element {
+    match icon {
+        Some(uri) => rsx! {
+            div { class: "ai img",
+                img { src: "{uri}", alt: "{name}" }
+            }
+        },
+        None => rsx! {
+            div { class: "ai", style: "background:var(--accent)", "{badge}" }
+        },
+    }
+}
+
 #[component]
 fn AppsPage() -> Element {
     let model = use_context::<Signal<AppModel>>();
     let m = model.read();
     let (title, sub, missing, launcher) =
         (m.t("page-apps-title"), m.t("page-apps-sub"), m.t("apps-not-installed"), m.t("apps-get-launcher"));
-    let rows: Vec<(String, &'static str, &'static str, &'static str, bool)> =
-        CRAFT_APPS.iter().map(|a| (a.id.to_string(), a.name, a.purpose, a.badge, m.installed.iter().any(|i| i.app.id == a.id))).collect();
+    let rows: Vec<CatalogTile> = CRAFT_APPS
+        .iter()
+        .map(|a| {
+            (a.id.to_string(), a.name, a.purpose, a.badge, m.installed.iter().any(|i| i.app.id == a.id), m.app_icons.get(a.id).cloned())
+        })
+        .collect();
     drop(m);
     rsx! {
         h1 { class: "page-title", "{title}" }
         div { class: "sub", "{sub}" }
         div { class: "apps",
-            for (id, name, purpose, badge, installed) in rows {
+            for (id, name, purpose, badge, installed, icon) in rows {
                 button {
                     key: "{id}",
                     class: "app-tile",
@@ -231,7 +258,7 @@ fn AppsPage() -> Element {
                             run(model, Command::OpenUrl(kd_store::LAUNCHER_REPO.to_string()));
                         }
                     },
-                    div { class: "ai", style: "background:var(--accent)", "{badge}" }
+                    AppIcon { icon: icon.clone(), badge, name }
                     div { class: "tx",
                         div { class: "nm", "{name}" }
                         div { class: "pp", if installed { "{purpose}" } else { "{launcher}" } }

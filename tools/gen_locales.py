@@ -49,6 +49,7 @@ add("module-markdown-tagline", "Documents and slides in plain text", "Documenten
 add("module-pdf-tagline", "View, annotate, organise and sign", "Bekijken, annoteren, ordenen en ondertekenen", "Afficher, annoter, organiser et signer", "Ansehen, kommentieren, ordnen und signieren")
 add("module-drawing-tagline", "Diagrams and figures as SVG", "Diagrammen en figuren als SVG", "Diagrammes et figures en SVG", "Diagramme und Abbildungen als SVG")
 add("apps-title", "Apps", "Apps", "Apps", "Apps")
+add("apps-refresh", "Refresh the apps and their versions", "Apps en versies vernieuwen", "Actualiser les apps et leurs versions", "Apps und Versionen aktualisieren")
 add("apps-see-all", "See all", "Alles tonen", "Tout afficher", "Alle anzeigen")
 add("apps-subtitle-none", "None installed yet · get them with the ArtCraft launcher", "Nog geen geïnstalleerd · haal ze op met de ArtCraft-launcher", "Aucune installée · obtenez-les avec le lanceur ArtCraft", "Noch keine installiert · über den ArtCraft-Launcher erhältlich")
 add("apps-subtitle", "{ $n } of { $total } installed on this computer", "{ $n } van { $total } geïnstalleerd op deze computer", "{ $n } sur { $total } installées sur cet ordinateur", "{ $n } von { $total } auf diesem Computer installiert")

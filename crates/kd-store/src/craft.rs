@@ -1,7 +1,10 @@
 //! Catalogue of the Crafting Apps the Glyphra start screen starts: the ArtCraft apps and
 //! SolidCraft (3D CAD, from Tangency Labs), in alphabetical order.
 //!
-//! MdCraft and PdfCraft are not listed: Glyphra's Markdown and PDF modules replace them.
+//! MdCraft is not listed: Glyphra's Markdown module replaces it. PdfCraft is listed (it organises
+//! and protects PDFs) but does not own the `.pdf` extension: Glyphra's PDF module opens those.
+//! ArtCraft is the AI image and video studio, Craft Anything the tool that explains how any
+//! software works; neither owns a file type.
 //! The start screen lists the installed apps and launches them; files they own appear
 //! under **All**.
 
@@ -40,7 +43,18 @@ const ARTCRAFT: &str = "ArtCraft";
 ///
 /// `designcraft` and `effectcraft` follow VectorCraft's `.vectorcraft`
 /// project-file pattern and still need confirming against those apps.
-pub const CRAFT_APPS: [CraftApp; 14] = [
+pub const CRAFT_APPS: [CraftApp; 18] = [
+    CraftApp {
+        name: "ArtCraft",
+        id: "artcraft",
+        aliases: &[],
+        bundle_id: "ai.storyteller.artcraft",
+        purpose: "AI image and video studio",
+        maker: ARTCRAFT,
+        badge: "ART",
+        group: DocGroup::Media,
+        extensions: &[],
+    },
     CraftApp {
         name: "CADCraft",
         id: "cadcraft",
@@ -51,6 +65,17 @@ pub const CRAFT_APPS: [CraftApp; 14] = [
         badge: "DWG",
         group: DocGroup::Cad,
         extensions: &["dwg", "dxf"],
+    },
+    CraftApp {
+        name: "Craft Anything",
+        id: "craft-anything",
+        aliases: &["CraftAnything"],
+        bundle_id: "ai.storyteller.craft-anything",
+        purpose: "See how any software works, then build your own",
+        maker: ARTCRAFT,
+        badge: "ANY",
+        group: DocGroup::Graphics,
+        extensions: &[],
     },
     CraftApp {
         name: "DeckCraft",
@@ -128,6 +153,28 @@ pub const CRAFT_APPS: [CraftApp; 14] = [
         badge: "RAW",
         group: DocGroup::Media,
         extensions: &["dng", "cr2", "cr3", "nef", "arw", "raf", "orf", "rw2"],
+    },
+    CraftApp {
+        name: "MaterialCraft",
+        id: "materialcraft",
+        aliases: &[],
+        bundle_id: "ai.storyteller.materialcraft",
+        purpose: "Procedural materials with node graphs",
+        maker: ARTCRAFT,
+        badge: "MAT",
+        group: DocGroup::Graphics,
+        extensions: &["sbs", "mcraft", "mcmat"],
+    },
+    CraftApp {
+        name: "PdfCraft",
+        id: "pdfcraft",
+        aliases: &["PrintCraft"],
+        bundle_id: "ai.storyteller.pdfcraft",
+        purpose: "Organise and protect PDFs",
+        maker: ARTCRAFT,
+        badge: "PDF",
+        group: DocGroup::Pdf,
+        extensions: &[],
     },
     CraftApp {
         name: "PhotoCraft",
@@ -220,12 +267,15 @@ mod tests {
         let mut sorted = names.clone();
         sorted.sort_unstable();
         assert_eq!(names, sorted);
-        for n in ["CADCraft", "FigCraft", "SoundCraft", "TextureCraft"] {
+        for n in ["ArtCraft", "CADCraft", "Craft Anything", "FigCraft", "MaterialCraft", "PdfCraft", "SoundCraft", "TextureCraft"] {
             assert!(names.contains(&n), "{n} missing");
         }
         assert_eq!(craft_for_extension("dwg").unwrap().name, "CADCraft");
         assert_eq!(craft_for_extension("fig").unwrap().name, "FigCraft");
         assert_eq!(craft_for_extension("flac").unwrap().name, "SoundCraft");
+        assert_eq!(craft_for_extension("sbs").unwrap().name, "MaterialCraft");
+        assert!(craft_for_extension("pdf").is_none(), "PDF files belong to Glyphra's PDF module");
+        assert_eq!(CRAFT_APPS.len(), 18);
     }
 
     #[test]

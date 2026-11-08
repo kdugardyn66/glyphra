@@ -30,6 +30,7 @@ module-markdown-tagline = Documents et diapositives en texte brut
 module-pdf-tagline = Afficher, annoter, organiser et signer
 module-drawing-tagline = Diagrammes et figures en SVG
 apps-title = Apps
+apps-refresh = Actualiser les apps et leurs versions
 apps-see-all = Tout afficher
 apps-subtitle-none = Aucune installée · obtenez-les avec le lanceur ArtCraft
 apps-subtitle = { $n } sur { $total } installées sur cet ordinateur

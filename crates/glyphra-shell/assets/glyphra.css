@@ -235,3 +235,5 @@ kbd { font: 12.5px ui-monospace, "SF Mono", Menlo, Consolas, monospace; padding:
 
 /* Shortcut text stays left-to-right inside right-to-left languages. */
 .hint, kbd, .card .key { direction: ltr; unicode-bidi: isolate; }
+
+.app-tile .pp .ver { margin-inline-end: 6px; font-weight: 600; color: var(--accent); direction: ltr; unicode-bidi: isolate; }

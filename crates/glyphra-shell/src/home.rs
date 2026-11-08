@@ -96,10 +96,39 @@ fn StartNew(into: Option<String>) -> Element {
     }
 }
 
-/// id, name, purpose, badge, location, icon
-type InstalledTile = (String, &'static str, &'static str, &'static str, String, Option<String>);
-/// id, name, purpose, badge, installed, icon
-type CatalogTile = (String, &'static str, &'static str, &'static str, bool, Option<String>);
+/// One app tile on the start screen and the Apps page.
+struct Tile {
+    id: String,
+    name: &'static str,
+    purpose: &'static str,
+    badge: &'static str,
+    installed: bool,
+    version: Option<String>,
+    place: String,
+    icon: Option<String>,
+}
+
+fn tiles(m: &AppModel, installed_only: bool) -> Vec<Tile> {
+    CRAFT_APPS
+        .iter()
+        .filter_map(|a| {
+            let found = m.installed.iter().find(|i| i.app.id == a.id);
+            if installed_only && found.is_none() {
+                return None;
+            }
+            Some(Tile {
+                id: a.id.to_string(),
+                name: a.name,
+                purpose: a.purpose,
+                badge: a.badge,
+                installed: found.is_some(),
+                version: found.and_then(|i| i.version.clone()),
+                place: found.map(|i| i.location()).unwrap_or_default(),
+                icon: m.app_icons.get(a.id).cloned(),
+            })
+        })
+        .collect()
+}
 
 #[component]
 fn AppsStrip() -> Element {
@@ -111,11 +140,8 @@ fn AppsStrip() -> Element {
     let sub =
         if n == 0 { m.t("apps-subtitle-none") } else { m.t_args("apps-subtitle", &[("n", n.into()), ("total", CRAFT_APPS.len().into())]) };
     let empty = m.t("apps-empty");
-    let tiles: Vec<InstalledTile> = m
-        .installed
-        .iter()
-        .map(|i| (i.app.id.to_string(), i.app.name, i.app.purpose, i.app.badge, i.location(), m.app_icons.get(i.app.id).cloned()))
-        .collect();
+    let tiles = tiles(&m, true);
+    let t_refresh = m.t("apps-refresh");
     drop(m);
     rsx! {
         div { class: "section",
@@ -124,22 +150,33 @@ fn AppsStrip() -> Element {
                     h2 { "{title}" }
                     span { class: "s", "{sub}" }
                 }
-                button { class: "link", onclick: move |_| run(model, Command::ShowPage(Page::CraftApps)), "{see_all}" }
+                div { style: "display:flex;align-items:center;gap:6px",
+                    button { class: "icon-btn", title: "{t_refresh}", onclick: move |_| run(model, Command::Refresh), Icon { name: "refresh", size: 16 } }
+                    button { class: "link", onclick: move |_| run(model, Command::ShowPage(Page::CraftApps)), "{see_all}" }
+                }
             }
             if tiles.is_empty() {
                 div { class: "empty", "{empty}" }
             } else {
                 div { class: "apps",
-                    for (id, name, purpose, badge, place, icon) in tiles {
+                    for t in tiles {
                         button {
-                            key: "{id}",
+                            key: "{t.id}",
                             class: "app-tile",
-                            title: "{place}",
-                            onclick: move |_| run(model, Command::LaunchCraft(id.clone())),
-                            AppIcon { icon: icon.clone(), badge, name }
+                            title: "{t.place}",
+                            onclick: {
+                                let id = t.id.clone();
+                                move |_| run(model, Command::LaunchCraft(id.clone()))
+                            },
+                            AppIcon { icon: t.icon.clone(), badge: t.badge, name: t.name }
                             div { class: "tx",
-                                div { class: "nm", "{name}" }
-                                div { class: "pp", "{purpose}" }
+                                div { class: "nm", "{t.name}" }
+                                div { class: "pp",
+                                    if let Some(v) = &t.version {
+                                        span { class: "ver", "v{v}" }
+                                    }
+                                    "{t.purpose}"
+                                }
                             }
                         }
                     }
@@ -234,34 +271,41 @@ fn AppsPage() -> Element {
     let m = model.read();
     let (title, sub, missing, launcher) =
         (m.t("page-apps-title"), m.t("page-apps-sub"), m.t("apps-not-installed"), m.t("apps-get-launcher"));
-    let rows: Vec<CatalogTile> = CRAFT_APPS
-        .iter()
-        .map(|a| {
-            (a.id.to_string(), a.name, a.purpose, a.badge, m.installed.iter().any(|i| i.app.id == a.id), m.app_icons.get(a.id).cloned())
-        })
-        .collect();
+    let rows = tiles(&m, false);
+    let t_refresh = m.t("apps-refresh");
     drop(m);
     rsx! {
-        h1 { class: "page-title", "{title}" }
+        div { style: "display:flex;align-items:center;justify-content:space-between;gap:12px",
+            h1 { class: "page-title", "{title}" }
+            button { class: "icon-btn", title: "{t_refresh}", onclick: move |_| run(model, Command::Refresh), Icon { name: "refresh", size: 18 } }
+        }
         div { class: "sub", "{sub}" }
         div { class: "apps",
-            for (id, name, purpose, badge, installed, icon) in rows {
+            for t in rows {
                 button {
-                    key: "{id}",
+                    key: "{t.id}",
                     class: "app-tile",
-                    style: if installed { "" } else { "opacity:.55" },
-                    title: if installed { "" } else { "{missing}" },
-                    onclick: move |_| {
-                        if installed {
-                            run(model, Command::LaunchCraft(id.clone()));
-                        } else {
-                            run(model, Command::OpenUrl(kd_store::LAUNCHER_REPO.to_string()));
+                    style: if t.installed { "" } else { "opacity:.55" },
+                    title: if t.installed { "{t.place}" } else { "{missing}" },
+                    onclick: {
+                        let (id, installed) = (t.id.clone(), t.installed);
+                        move |_| {
+                            if installed {
+                                run(model, Command::LaunchCraft(id.clone()));
+                            } else {
+                                run(model, Command::OpenUrl(kd_store::LAUNCHER_REPO.to_string()));
+                            }
                         }
                     },
-                    AppIcon { icon: icon.clone(), badge, name }
+                    AppIcon { icon: t.icon.clone(), badge: t.badge, name: t.name }
                     div { class: "tx",
-                        div { class: "nm", "{name}" }
-                        div { class: "pp", if installed { "{purpose}" } else { "{launcher}" } }
+                        div { class: "nm", "{t.name}" }
+                        div { class: "pp",
+                            if let Some(v) = &t.version {
+                                span { class: "ver", "v{v}" }
+                            }
+                            if t.installed { "{t.purpose}" } else { "{launcher}" }
+                        }
                     }
                 }
             }

@@ -134,7 +134,7 @@ mod tests {
     #[test]
     fn modules_win_over_crafting_apps() {
         let k = DocKind::from_path(Path::new("a/Report.PDF")).unwrap();
-        assert_eq!(k.opener, Opener::Module(ModuleKind::Pdf));
+        assert_eq!(k.opener, Opener::Module(ModuleKind::Pdf), "Glyphra opens PDF itself even though PdfCraft lists it");
         assert_eq!(k.group, DocGroup::Pdf);
         let svg = DocKind::from_path(Path::new("fig.svg")).unwrap();
         assert_eq!(svg.opener, Opener::Module(ModuleKind::Drawing));

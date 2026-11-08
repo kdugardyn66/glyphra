@@ -106,6 +106,7 @@ struct Tile {
     version: Option<String>,
     place: String,
     icon: Option<String>,
+    extensions: &'static [&'static str],
 }
 
 fn tiles(m: &AppModel, installed_only: bool) -> Vec<Tile> {
@@ -125,6 +126,7 @@ fn tiles(m: &AppModel, installed_only: bool) -> Vec<Tile> {
                 version: found.and_then(|i| i.version.clone()),
                 place: found.map(|i| i.location()).unwrap_or_default(),
                 icon: m.app_icons.get(a.id).cloned(),
+                extensions: a.extensions,
             })
         })
         .collect()
@@ -175,7 +177,9 @@ fn AppsStrip() -> Element {
                                     if let Some(v) = &t.version {
                                         span { class: "ver", "v{v}" }
                                     }
-                                    "{t.purpose}"
+                                    if let Some(ext) = t.extensions.first() {
+                                        span { class: "defext", ".{ext}" }
+                                    }
                                 }
                             }
                         }
@@ -273,6 +277,7 @@ fn AppsPage() -> Element {
         (m.t("page-apps-title"), m.t("page-apps-sub"), m.t("apps-not-installed"), m.t("apps-get-launcher"));
     let rows = tiles(&m, false);
     let t_refresh = m.t("apps-refresh");
+    let (l_opens, l_none) = (m.t("apps-opens"), m.t("apps-opens-none"));
     drop(m);
     rsx! {
         div { style: "display:flex;align-items:center;justify-content:space-between;gap:12px",
@@ -280,12 +285,11 @@ fn AppsPage() -> Element {
             button { class: "icon-btn", title: "{t_refresh}", onclick: move |_| run(model, Command::Refresh), Icon { name: "refresh", size: 18 } }
         }
         div { class: "sub", "{sub}" }
-        div { class: "apps",
+        div { class: "app-cards",
             for t in rows {
                 button {
                     key: "{t.id}",
-                    class: "app-tile",
-                    style: if t.installed { "" } else { "opacity:.55" },
+                    class: if t.installed { "app-card" } else { "app-card off" },
                     title: if t.installed { "{t.place}" } else { "{missing}" },
                     onclick: {
                         let (id, installed) = (t.id.clone(), t.installed);
@@ -297,15 +301,29 @@ fn AppsPage() -> Element {
                             }
                         }
                     },
-                    AppIcon { icon: t.icon.clone(), badge: t.badge, name: t.name }
-                    div { class: "tx",
-                        div { class: "nm", "{t.name}" }
-                        div { class: "pp",
-                            if let Some(v) = &t.version {
-                                span { class: "ver", "v{v}" }
+                    div { class: "top",
+                        AppIcon { icon: t.icon.clone(), badge: t.badge, name: t.name }
+                        div { class: "tx",
+                            div { class: "nm",
+                                "{t.name}"
+                                if let Some(v) = &t.version {
+                                    span { class: "ver", "v{v}" }
+                                }
                             }
-                            if t.installed { "{t.purpose}" } else { "{launcher}" }
+                            div { class: "pp", "{t.purpose}" }
                         }
+                    }
+                    div { class: "types",
+                        span { class: "lab", "{l_opens}" }
+                        if t.extensions.is_empty() {
+                            span { class: "none", "{l_none}" }
+                        }
+                        for (i , ext) in t.extensions.iter().enumerate() {
+                            span { key: "{ext}", class: if i == 0 { "ext def" } else { "ext" }, ".{ext}" }
+                        }
+                    }
+                    if !t.installed {
+                        div { class: "get", "{launcher}" }
                     }
                 }
             }

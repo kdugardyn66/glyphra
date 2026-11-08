@@ -2,7 +2,7 @@
 
 Markdown, PDF and Drawing in one workspace, with Glyphra AI and team collaboration on your own server.
 
-**Version 0.1.3** — splash screen, start screen, native menu bar, four languages; settings with Apply/Close, a changeable documents folder, documents in tabs or windows, the icons of installed apps, a File, Window and Help menu as on a Mac, all 18 Crafting Apps with versions and a refresh button.
+**Version 0.1.4** — splash screen, start screen, native menu bar, four languages; settings with Apply/Close, a changeable documents folder, documents in tabs or windows, the icons of installed apps, a File, Window and Help menu as on a Mac, all 18 Crafting Apps as big cards with versions, file types (default in bold) and a refresh button.
 Editing arrives in 0.3.0; see the plan for the road to 1.0.0.
 
 ## Run

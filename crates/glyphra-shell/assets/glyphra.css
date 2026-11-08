@@ -237,3 +237,23 @@ kbd { font: 12.5px ui-monospace, "SF Mono", Menlo, Consolas, monospace; padding:
 .hint, kbd, .card .key { direction: ltr; unicode-bidi: isolate; }
 
 .app-tile .pp .ver { margin-inline-end: 6px; font-weight: 600; color: var(--accent); direction: ltr; unicode-bidi: isolate; }
+
+/* Apps page: big cards with icon, summary and the file types the app opens */
+.app-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px; }
+.app-card { padding: 16px; display: flex; flex-direction: column; gap: 14px; border-radius: 12px; background: var(--surface); border: 1px solid var(--border); text-align: start; min-height: 150px; }
+.app-card:hover { background: var(--surface-hover); border-color: var(--accent); }
+.app-card.off { opacity: .6; }
+.app-card .top { display: flex; align-items: flex-start; gap: 14px; }
+.app-card .ai { width: 56px; height: 56px; border-radius: 13px; display: grid; place-items: center; font-size: 13px; font-weight: 700; color: #fff; flex: none; }
+.app-card .ai img { width: 56px; height: 56px; object-fit: contain; border-radius: 13px; }
+.app-card .tx { min-width: 0; flex: 1; }
+.app-card .nm { font-size: 17px; font-weight: 600; }
+.app-card .nm .ver { margin-inline-start: 8px; font-size: 12px; font-weight: 600; color: var(--accent); direction: ltr; unicode-bidi: isolate; }
+.app-card .pp { margin-top: 3px; font-size: 13px; line-height: 1.4; color: var(--text-faint); }
+.app-card .types { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: auto; }
+.app-card .types .lab { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--text-faint); margin-inline-end: 4px; }
+.app-card .ext { font-size: 12px; padding: 2px 8px; border-radius: 6px; background: var(--chrome); border: 1px solid var(--border); color: var(--text-faint); direction: ltr; unicode-bidi: isolate; }
+.app-card .ext.def { font-weight: 700; color: var(--text); }
+.app-card .none { font-size: 12.5px; color: var(--text-faint); }
+.app-card .get { font-size: 12.5px; color: var(--accent); }
+.app-tile .pp .defext { font-weight: 700; color: var(--text); direction: ltr; unicode-bidi: isolate; }

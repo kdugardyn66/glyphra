@@ -2,7 +2,7 @@
 //! SolidCraft (3D CAD, from Tangency Labs), in alphabetical order.
 //!
 //! MdCraft is not listed: Glyphra's Markdown module replaces it. PdfCraft is listed (it organises
-//! and protects PDFs) but does not own the `.pdf` extension: Glyphra's PDF module opens those.
+//! and protects PDFs) and lists `.pdf`, but Glyphra's own PDF module opens PDF files first.
 //! ArtCraft is the AI image and video studio, Craft Anything the tool that explains how any
 //! software works; neither owns a file type.
 //! The start screen lists the installed apps and launches them; files they own appear
@@ -28,8 +28,16 @@ pub struct CraftApp {
     pub badge: &'static str,
     /// Filter pill its files appear under.
     pub group: DocGroup,
-    /// Lower-case extensions without the dot. Each extension belongs to one app.
+    /// Lower-case extensions without the dot. Each extension belongs to one app. The first is
+    /// the app's own (default) format; the rest are formats it can also open.
     pub extensions: &'static [&'static str],
+}
+
+impl CraftApp {
+    /// The app's own format: the first of its extensions.
+    pub fn default_extension(&self) -> Option<&'static str> {
+        self.extensions.first().copied()
+    }
 }
 
 /// Where the ArtCraft team publishes the launcher for its apps.
@@ -174,7 +182,7 @@ pub const CRAFT_APPS: [CraftApp; 18] = [
         maker: ARTCRAFT,
         badge: "PDF",
         group: DocGroup::Pdf,
-        extensions: &[],
+        extensions: &["pdf"],
     },
     CraftApp {
         name: "PhotoCraft",
@@ -261,6 +269,10 @@ mod tests {
         assert_eq!(craft_for_extension("stl").unwrap().name, "SolidCraft");
     }
 
+    fn app(name: &str) -> &'static CraftApp {
+        CRAFT_APPS.iter().find(|a| a.name == name).unwrap()
+    }
+
     #[test]
     fn apps_are_alphabetical_and_include_the_new_ones() {
         let names: Vec<&str> = CRAFT_APPS.iter().map(|a| a.name).collect();
@@ -274,7 +286,10 @@ mod tests {
         assert_eq!(craft_for_extension("fig").unwrap().name, "FigCraft");
         assert_eq!(craft_for_extension("flac").unwrap().name, "SoundCraft");
         assert_eq!(craft_for_extension("sbs").unwrap().name, "MaterialCraft");
-        assert!(craft_for_extension("pdf").is_none(), "PDF files belong to Glyphra's PDF module");
+        assert_eq!(craft_for_extension("pdf").unwrap().name, "PdfCraft");
+        assert_eq!(app("PdfCraft").extensions, ["pdf"]);
+        assert_eq!(app("PdfCraft").default_extension(), Some("pdf"));
+        assert_eq!(app("ArtCraft").default_extension(), None);
         assert_eq!(CRAFT_APPS.len(), 18);
     }
 

@@ -2202,7 +2202,7 @@ dependencies = [
 
 [[package]]
 name = "glyphra"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "dioxus",
  "glyphra-i18n",
@@ -2214,7 +2214,7 @@ dependencies = [
 
 [[package]]
 name = "glyphra-i18n"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "fluent-bundle",
  "fluent-syntax",
@@ -2226,7 +2226,7 @@ dependencies = [
 
 [[package]]
 name = "glyphra-shell"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "chrono",
  "dioxus",
@@ -2234,7 +2234,11 @@ dependencies = [
  "kd-ai",
  "kd-commands",
  "kd-store",
+ "objc2",
+ "objc2-app-kit",
+ "objc2-foundation",
  "open",
+ "png 0.17.16",
  "pulldown-cmark",
  "rfd 0.15.4",
  "serde_json",
@@ -2818,7 +2822,7 @@ dependencies = [
 
 [[package]]
 name = "kd-ai"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "base64 0.22.1",
  "log",
@@ -2832,14 +2836,14 @@ dependencies = [
 
 [[package]]
 name = "kd-commands"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "kd-store",
 ]
 
 [[package]]
 name = "kd-store"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "directories",
  "keyring",

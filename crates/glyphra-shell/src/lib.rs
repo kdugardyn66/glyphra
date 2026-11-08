@@ -18,6 +18,7 @@ mod settings;
 mod settings_ai;
 mod sidebar;
 mod tabs;
+mod winicon;
 
 pub use app::{DocWindow, Root, mark_process_start, set_language_hook, set_menu_hook};
 pub use model::{AppModel, Effect};

@@ -194,6 +194,7 @@ fn alive_windows() -> Vec<PathBuf> {
 pub fn DocWindow(path: PathBuf) -> Element {
     let model = use_context_provider(|| Signal::new(AppModel::for_document_window(&path, system_language())));
     let loaded = model.read().tabs.len() > 1;
+    crate::winicon::use_theme_icon(model);
     use_effect(move || {
         if !loaded {
             dioxus::desktop::window().close();
@@ -255,6 +256,7 @@ pub fn Root() -> Element {
     // A cheap placeholder (built-in languages only) so the splash can already speak.
     let mut model = use_context_provider(|| Signal::new(AppModel::placeholder(Catalog::load(None).0, system_language())));
     let mut phase = use_signal(|| Phase::Loading);
+    crate::winicon::use_theme_icon(model);
 
     use_future(move || async move {
         trace("splash is on screen");

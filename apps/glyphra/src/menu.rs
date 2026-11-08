@@ -5,11 +5,11 @@
 //! labels are Fluent ids; [`relabel`] renames every item when the language changes.
 
 use dioxus::desktop::muda::{
-    Menu, MenuItem, PredefinedMenuItem, Submenu,
+    CheckMenuItem, Menu, MenuItem, PredefinedMenuItem, Submenu,
     accelerator::{Accelerator, Code, Modifiers},
 };
 use glyphra_i18n::I18n;
-use kd_commands::menu::{Entry, Menu as Spec, Native, menu_bar, menu_id};
+use kd_commands::menu::{Entry, Menu as Spec, MenuView, Native, menu_bar, menu_id, window_item_id};
 use kd_commands::{Chord, Command, Keymap, Os};
 use std::cell::RefCell;
 
@@ -24,7 +24,14 @@ struct Labelled {
     key: String,
 }
 
+/// The Window menu and how many fixed entries it has; the list of open windows follows them.
+struct WindowMenu {
+    menu: Submenu,
+    fixed: usize,
+}
+
 thread_local! {
+    static WINDOW_MENU: RefCell<Option<WindowMenu>> = const { RefCell::new(None) };
     /// The menu runs on the main thread together with the window, so a thread-local is enough.
     static ITEMS: RefCell<Vec<Labelled>> = const { RefCell::new(Vec::new()) };
 }
@@ -126,11 +133,12 @@ pub fn build(i18n: &I18n) -> Menu {
     for spec in menu_bar(mac) {
         let sub = submenu(&spec, i18n, &keymap);
         let _ = menu.append(&sub);
+        if spec.label_key == "menu-window" {
+            let fixed = sub.items().len();
+            WINDOW_MENU.with(|w| *w.borrow_mut() = Some(WindowMenu { menu: sub.clone(), fixed }));
+        }
         #[cfg(target_os = "macos")]
         {
-            if spec.label_key == "menu-window" {
-                sub.set_as_windows_menu_for_nsapp();
-            }
             if spec.label_key == "menu-help" {
                 sub.set_as_help_menu_for_nsapp();
             }
@@ -169,9 +177,47 @@ fn submenu(spec: &Spec, i18n: &I18n, keymap: &Keymap) -> Submenu {
 }
 
 fn append_item(sub: &Submenu, cmd: &Command, label_key: &str, i18n: &I18n, keymap: &Keymap) {
-    let item = MenuItem::with_id(menu_id(cmd), i18n.t(label_key), true, accelerator_for(cmd, keymap));
+    // Save, Save As and Print wait for a document ([`update`] switches them on).
+    let enabled = !needs_document(cmd);
+    let item = MenuItem::with_id(menu_id(cmd), i18n.t(label_key), enabled, accelerator_for(cmd, keymap));
     let _ = sub.append(&item);
     remember(Handle::Item(item), label_key);
+}
+
+fn needs_document(cmd: &Command) -> bool {
+    matches!(cmd, Command::Save | Command::SaveAs | Command::Print)
+}
+
+/// Show what the window's state asks for: Save, Save As and Print only with a document in
+/// front, and the list of the home window, tabs and document windows under the Window menu.
+pub fn update(view: &MenuView, _i18n: &I18n) {
+    ITEMS.with(|items| {
+        for it in items.borrow().iter() {
+            if let Handle::Item(i) = &it.handle {
+                let is_doc_command = [Command::Save, Command::SaveAs, Command::Print].iter().any(|c| i.id().0 == menu_id(c));
+                if is_doc_command {
+                    i.set_enabled(view.document);
+                }
+            }
+        }
+    });
+    WINDOW_MENU.with(|w| {
+        let w = w.borrow();
+        let Some(w) = w.as_ref() else { return };
+        while w.menu.items().len() > w.fixed {
+            if w.menu.remove_at(w.fixed).is_none() {
+                break;
+            }
+        }
+        if view.windows.is_empty() {
+            return;
+        }
+        let _ = w.menu.append(&PredefinedMenuItem::separator());
+        for item in &view.windows {
+            let entry = CheckMenuItem::with_id(window_item_id(&item.command), &item.title, true, item.checked, None);
+            let _ = w.menu.append(&entry);
+        }
+    });
 }
 
 fn native(n: Native, label: &str) -> PredefinedMenuItem {

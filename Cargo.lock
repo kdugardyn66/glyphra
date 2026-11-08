@@ -2088,7 +2088,7 @@ dependencies = [
 
 [[package]]
 name = "glyphra"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "dioxus",
  "glyphra-i18n",
@@ -2100,7 +2100,7 @@ dependencies = [
 
 [[package]]
 name = "glyphra-i18n"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "fluent-bundle",
  "fluent-syntax",
@@ -2112,7 +2112,7 @@ dependencies = [
 
 [[package]]
 name = "glyphra-shell"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "chrono",
  "dioxus",
@@ -2675,14 +2675,14 @@ dependencies = [
 
 [[package]]
 name = "kd-commands"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "kd-store",
 ]
 
 [[package]]
 name = "kd-store"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "directories",
  "plist",

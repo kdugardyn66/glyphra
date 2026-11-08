@@ -88,6 +88,26 @@ impl Menu {
 pub const HELP_URL: &str = "https://github.com/kdugardyn66/glyphra#readme";
 pub const ISSUES_URL: &str = "https://github.com/kdugardyn66/glyphra/issues";
 
+/// One line of the Window menu's list of open windows and tabs.
+#[derive(Debug, Clone, PartialEq)]
+pub struct WindowItem {
+    /// Shown as is: the document's file name, or the app name for the home window.
+    pub title: String,
+    /// What choosing it does: [`Command::ActivateTab`] or [`Command::OpenPath`] (which brings
+    /// that document's window to the front).
+    pub command: Command,
+    pub checked: bool,
+}
+
+/// What the native menu shows that depends on the window's state.
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct MenuView {
+    /// A document is in front: Save, Save As and Print are available.
+    pub document: bool,
+    /// The home window, then every open tab and document window.
+    pub windows: Vec<WindowItem>,
+}
+
 /// The id a native menu item carries: the command id, plus the address for link items.
 pub fn menu_id(c: &Command) -> String {
     match c {
@@ -96,8 +116,23 @@ pub fn menu_id(c: &Command) -> String {
     }
 }
 
-/// The command behind a native menu item's id (the inverse of [`menu_id`]).
+/// The id of an item in the Window menu's list (these carry a tab number or a file path).
+pub fn window_item_id(c: &Command) -> String {
+    match c {
+        Command::ActivateTab(n) => format!("app.window:tab:{n}"),
+        Command::OpenPath(p) => format!("app.window:file:{}", p.display()),
+        other => other.id(),
+    }
+}
+
+/// The command behind a native menu item's id (the inverse of [`menu_id`] and [`window_item_id`]).
 pub fn command_for_menu_id(id: &str) -> Option<Command> {
+    if let Some(rest) = id.strip_prefix("app.window:") {
+        if let Some(n) = rest.strip_prefix("tab:") {
+            return n.parse().ok().map(Command::ActivateTab);
+        }
+        return rest.strip_prefix("file:").map(|p| Command::OpenPath(p.into()));
+    }
     if let Some(url) = id.strip_prefix("app.open_url:") {
         return Some(Command::OpenUrl(url.to_string()));
     }
@@ -127,14 +162,18 @@ pub fn menu_bar(mac: bool) -> Vec<Menu> {
         });
     }
     let new = Menu { label_key: "menu-new", entries: ModuleKind::ALL.into_iter().map(|k| C(Command::NewDocument(k))).collect() };
+    // As on a Mac: New ▸, Open…, Close, Save, Save As…, Print… (Save, Save As and Print are
+    // greyed out on the home screen). The other file commands keep their shortcuts and live
+    // on the start screen.
     let mut file = vec![
-        C(Command::NewDocumentPicker),
         Entry::Submenu(new),
         C(Command::OpenDialog),
-        C(Command::PinFolder),
         Sep,
-        C(Command::CloseActiveTab),
-        C(Command::ReopenClosedTab),
+        Entry::Labelled("menu-close", Command::CloseActiveTab),
+        C(Command::Save),
+        C(Command::SaveAs),
+        Sep,
+        C(Command::Print),
     ];
     if !mac {
         file.extend([Sep, C(Command::OpenSettings(SettingsSection::General)), Sep, C(Command::Quit)]);
@@ -170,8 +209,8 @@ pub fn menu_bar(mac: bool) -> Vec<Menu> {
             N(Native::Fullscreen),
         ],
     });
-    let mut window =
-        vec![N(Native::Minimize), N(Native::Zoom), Sep, C(Command::NextTab), C(Command::PreviousTab), C(Command::ActivateTab(0))];
+    // The list of open windows and tabs follows these entries; the shell adds it (see [`MenuView`]).
+    let mut window = vec![N(Native::Minimize), N(Native::Zoom)];
     if mac {
         window.extend([Sep, N(Native::BringAllToFront)]);
     }
@@ -184,6 +223,7 @@ pub fn menu_bar(mac: bool) -> Vec<Menu> {
             Sep,
             C(Command::OpenSettings(SettingsSection::Keyboard)),
             C(Command::OpenSettings(SettingsSection::LicenseMit)),
+            C(Command::OpenSettings(SettingsSection::LicenseApache)),
         ],
     });
     bar
@@ -211,6 +251,35 @@ mod tests {
             }
         }
         assert_eq!(command_for_menu_id("no.such.thing"), None);
+    }
+
+    #[test]
+    fn window_list_ids_round_trip() {
+        for c in [Command::ActivateTab(0), Command::ActivateTab(7), Command::OpenPath("/a b/c:d.md".into())] {
+            assert_eq!(command_for_menu_id(&window_item_id(&c)), Some(c));
+        }
+        assert_eq!(command_for_menu_id("app.window:tab:x"), None);
+    }
+
+    #[test]
+    fn the_file_menu_matches_the_mac_layout() {
+        let file = menu_bar(true).into_iter().find(|m| m.label_key == "menu-file").unwrap();
+        let cmds: Vec<String> = file.commands().iter().map(|c| c.id()).collect();
+        assert_eq!(
+            cmds,
+            [
+                "file.new.markdown",
+                "file.new.pdf",
+                "file.new.drawing",
+                "file.open",
+                "tab.close_active",
+                "file.save",
+                "file.save_as",
+                "file.print"
+            ]
+        );
+        let help = menu_bar(true).into_iter().find(|m| m.label_key == "menu-help").unwrap();
+        assert_eq!(help.commands().last().map(|c| c.id()), Some("settings.open.license-apache".to_string()));
     }
 
     #[test]
@@ -248,6 +317,9 @@ mod tests {
         assert_eq!(shown(&Command::OpenDialog), "Cmd+O");
         assert_eq!(shown(&Command::CloseActiveTab), "Cmd+W");
         assert_eq!(shown(&Command::FocusSearch), "Cmd+F");
+        assert_eq!(shown(&Command::Save), "Cmd+S");
+        assert_eq!(shown(&Command::SaveAs), "Cmd+Shift+S");
+        assert_eq!(shown(&Command::Print), "Cmd+P");
     }
 
     #[test]

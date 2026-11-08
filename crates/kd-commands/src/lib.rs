@@ -509,7 +509,7 @@ impl Keymap {
             Binding { command: Command::NewDocument(ModuleKind::Drawing), keys: n("D") },
             Binding { command: Command::OpenDialog, keys: p("O") },
             Binding { command: Command::Save, keys: p("S") },
-            Binding { command: Command::SaveAs, keys: vec![Chord::new("S").primary(os).alt()] },
+            Binding { command: Command::SaveAs, keys: vec![Chord::new("S").primary(os).shift()] },
             Binding { command: Command::Print, keys: p("P") },
             Binding { command: Command::CloseActiveTab, keys: p("W") },
             Binding { command: Command::ReopenClosedTab, keys: ps("T") },

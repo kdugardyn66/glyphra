@@ -41,6 +41,14 @@ pub fn set_language_hook(hook: fn(&glyphra_i18n::I18n)) {
     let _ = LANGUAGE_HOOK.set(hook);
 }
 
+static MENU_HOOK: std::sync::OnceLock<fn(&kd_commands::menu::MenuView, &glyphra_i18n::I18n)> = std::sync::OnceLock::new();
+
+/// Register a function the window calls whenever what the menu shows changes: whether a
+/// document is in front (Save, Save As, Print) and the list in the Window menu.
+pub fn set_menu_hook(hook: fn(&kd_commands::menu::MenuView, &glyphra_i18n::I18n)) {
+    let _ = MENU_HOOK.set(hook);
+}
+
 /// The system language as a BCP 47 tag ("en-US"), or empty.
 fn system_language() -> String {
     sys_locale::get_locale().unwrap_or_default()
@@ -123,6 +131,7 @@ fn exec(mut model: Signal<AppModel>, effect: Effect) {
             });
         }
         Effect::OpenInWindow(path) => open_window(path),
+        Effect::FocusMainWindow => dioxus::desktop::window().window.set_focus(),
         Effect::FocusSearch => {
             document::eval("setTimeout(() => document.getElementById('search')?.focus(), 30)");
         }
@@ -160,6 +169,17 @@ fn open_window(path: PathBuf) {
             w.insert(path, Rc::downgrade(&handle));
         });
     });
+}
+
+/// Documents whose own window is still open.
+fn alive_windows() -> Vec<PathBuf> {
+    WINDOWS.with(|w| {
+        let mut w = w.borrow_mut();
+        w.retain(|_, v| v.strong_count() > 0);
+        let mut v: Vec<PathBuf> = w.keys().cloned().collect();
+        v.sort();
+        v
+    })
 }
 
 /// The window of one document: its own model (same settings and language), no tabs, no sidebar.
@@ -252,6 +272,28 @@ pub fn Root() -> Element {
         let _ = tag();
         if let Some(hook) = LANGUAGE_HOOK.get() {
             hook(&model.peek().i18n);
+        }
+    });
+
+    // Keep the native menu's Save/Print state and Window list current.
+    let view = use_memo(move || {
+        let m = model.read();
+        (m.menu_view(), m.i18n.info().tag.clone())
+    });
+    use_effect(move || {
+        let _ = view();
+        if let Some(hook) = MENU_HOOK.get() {
+            hook(&model.peek().menu_view(), &model.peek().i18n);
+        }
+    });
+    // Which document windows are still open (a closed window cannot tell the main one).
+    use_future(move || async move {
+        loop {
+            tokio::time::sleep(Duration::from_millis(800)).await;
+            let alive = alive_windows();
+            if model.peek().open_windows != alive {
+                model.write().open_windows = alive;
+            }
         }
     });
 

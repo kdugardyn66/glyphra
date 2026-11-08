@@ -163,6 +163,7 @@ menu-view = Weergave
 menu-window = Venster
 menu-help = Help
 menu-new = Nieuw
+menu-close = Sluiten
 menu-theme = Thema
 native-undo = Ongedaan maken
 native-redo = Opnieuw

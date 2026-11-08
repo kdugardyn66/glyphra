@@ -163,6 +163,7 @@ menu-view = Présentation
 menu-window = Fenêtre
 menu-help = Aide
 menu-new = Nouveau
+menu-close = Fermer
 menu-theme = Thème
 native-undo = Annuler
 native-redo = Rétablir

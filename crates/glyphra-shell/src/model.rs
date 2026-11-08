@@ -7,6 +7,7 @@
 
 use crate::preview;
 use glyphra_i18n::{Arg, Catalog, I18n};
+use kd_commands::menu::{MenuView, WindowItem};
 use kd_commands::{Command, Page, SettingsSection};
 use kd_store::{
     DocGroup, DocKind, FileEntry, HomeState, InstalledApp, ModuleKind, OpenIn, Opener, Settings, Store, ThemePref, create_folder,
@@ -35,6 +36,8 @@ pub enum Effect {
         file: Option<PathBuf>,
     },
     FocusSearch,
+    /// Bring the main window to the front.
+    FocusMainWindow,
     /// Show the folder dialog for the documents folder; the answer goes to [`AppModel::draft_documents_dir`].
     PickDocumentsFolderDialog,
     /// Open a document in a window of its own (or bring that window forward).
@@ -145,6 +148,8 @@ pub struct AppModel {
     /// This is a document window: documents open in its own tab, never in another window,
     /// and nothing is written to the settings or the library.
     pub detached: bool,
+    /// Documents that have a window of their own right now (kept up to date by the window layer).
+    pub open_windows: Vec<PathBuf>,
     pub toast: Option<Toast>,
     toast_seq: u64,
     /// Bumped whenever files may have changed, so views re-read the disk.
@@ -202,6 +207,7 @@ impl AppModel {
             draft: Settings::with_documents_dir(PathBuf::new()),
             app_icons: HashMap::new(),
             detached: false,
+            open_windows: Vec::new(),
             toast: None,
             toast_seq: 0,
             revision: 0,
@@ -285,6 +291,20 @@ impl AppModel {
     fn set_language(&mut self, tag: &str) {
         self.state.settings.language = tag.to_string();
         self.i18n = I18n::new(&self.catalog, tag, &self.system_language);
+    }
+
+    /// What the native menu needs: whether a document is in front, and the Window menu's list
+    /// (the home window, every open tab, every document window).
+    pub fn menu_view(&self) -> MenuView {
+        let mut windows = vec![WindowItem { title: self.t("app-name"), command: Command::ActivateTab(0), checked: self.active == 0 }];
+        for (i, tab) in self.tabs.iter().enumerate().skip(1) {
+            windows.push(WindowItem { title: tab.title.clone(), command: Command::ActivateTab(i), checked: self.active == i });
+        }
+        for path in &self.open_windows {
+            let title = path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
+            windows.push(WindowItem { title, command: Command::OpenPath(path.clone()), checked: false });
+        }
+        MenuView { document: self.active != 0, windows }
     }
 
     pub fn is_home(&self) -> bool {
@@ -571,6 +591,7 @@ impl AppModel {
                 if i < self.tabs.len() {
                     self.active = i;
                 }
+                return vec![Effect::FocusMainWindow];
             }
             Command::NextTab => self.active = (self.active + 1) % self.tabs.len(),
             Command::PreviousTab => self.active = (self.active + self.tabs.len() - 1) % self.tabs.len(),
@@ -1031,6 +1052,27 @@ mod tests {
         m.draft.language = tag.to_string();
         assert!(m.apply_settings());
         m.close_settings();
+    }
+
+    #[test]
+    fn the_window_menu_lists_home_tabs_and_windows() {
+        let tmp = tempfile::tempdir().unwrap();
+        let mut m = model(tmp.path());
+        let doc = tmp.path().join("a.md");
+        fs::write(&doc, "# a").unwrap();
+        let v = m.menu_view();
+        assert!(!v.document, "home: Save, Save As and Print are off");
+        assert_eq!(v.windows.len(), 1);
+        assert_eq!(v.windows[0].title, "Glyphra");
+        assert!(v.windows[0].checked);
+        m.dispatch(Command::OpenPath(doc));
+        m.open_windows.push(tmp.path().join("w.md"));
+        let v = m.menu_view();
+        assert!(v.document);
+        let titles: Vec<_> = v.windows.iter().map(|w| (w.title.as_str(), w.checked)).collect();
+        assert_eq!(titles, [("Glyphra", false), ("a.md", true), ("w.md", false)]);
+        assert_eq!(m.dispatch(Command::ActivateTab(0)), vec![Effect::FocusMainWindow]);
+        assert!(!m.menu_view().document);
     }
 
     #[test]

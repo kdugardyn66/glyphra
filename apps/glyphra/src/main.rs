@@ -17,6 +17,7 @@ fn main() {
     let (catalog, _) = Catalog::load(Some(&store.locales_dir()));
     let bar = menu::build(&I18n::new(&catalog, &store.saved_language(), &system));
     glyphra_shell::set_language_hook(menu::relabel);
+    glyphra_shell::set_menu_hook(menu::update);
 
     let window = WindowBuilder::new()
         .with_title("Glyphra")

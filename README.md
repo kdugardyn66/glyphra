@@ -2,7 +2,7 @@
 
 Markdown, PDF and Drawing in one workspace, with Glyphra AI and team collaboration on your own server.
 
-**Version 0.2.3** — AI Tools can draft a document or a slide deck from a description (Markdown now, PDF with 0.7.0); the app icon follows the theme (light or dark, System follows the OS); Glyphra AI (providers in Settings › AI providers by region, with Test connection; models in Settings › AI models): an **AI Chat** page and an **AI Tools** page in the sidebar, and Settings › AI with providers (Anthropic, Gemini, OpenAI, Mistral, local Ollama and LM Studio, any OpenAI-compatible server, and more), models per part of the app and API keys in the system keychain. Before that: splash and start screen, native menu bar, four languages, settings with Apply/Close, documents in tabs or windows, all 18 Crafting Apps.
+**Version 0.2.4** — the macOS .dmg builds again, with a new window background; AI Tools can draft a document or a slide deck from a description (Markdown now, PDF with 0.7.0); the app icon follows the theme (light or dark, System follows the OS); Glyphra AI (providers in Settings › AI providers by region, with Test connection; models in Settings › AI models): an **AI Chat** page and an **AI Tools** page in the sidebar, and Settings › AI with providers (Anthropic, Gemini, OpenAI, Mistral, local Ollama and LM Studio, any OpenAI-compatible server, and more), models per part of the app and API keys in the system keychain. Before that: splash and start screen, native menu bar, four languages, settings with Apply/Close, documents in tabs or windows, all 18 Crafting Apps.
 Editing arrives in 0.3.0; see the plan for the road to 1.0.0.
 
 ## Run

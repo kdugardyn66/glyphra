@@ -10,14 +10,18 @@
 # The .dmg is made with `diskutil image` on macOS 26 and newer (hdiutil is deprecated there)
 # and with hdiutil on older systems. Finder lays out its window with a background; allow
 # Terminal to control Finder when asked, or set DMG_LAYOUT=0 (headless/CI, no background).
-#   DMG_BACKGROUND=my.png   another background (640x400; my@2x.png beside it for Retina)
+#   DMG_BACKGROUND=my.png   another background (640x400, 72 dpi; my@2x.png, 1280x800, 144 dpi beside it for Retina)
+#                           the default is packaging/macos/dmg-background.svg (tools/gen_dmg_background.sh)
 #
 # Signing (optional; without it the app is ad-hoc signed and runs on this Mac):
 #   APPLE_SIGNING_IDENTITY="Developer ID Application: Your Name (TEAMID)"
 # Notarization (optional; needs the identity above and a stored notarytool profile):
 #   xcrun notarytool store-credentials glyphra-notary --apple-id you@example.com --team-id TEAMID
 #   APPLE_NOTARY_PROFILE=glyphra-notary
-set -euo pipefail
+set -Eeuo pipefail
+# A command that fails under `set -e` used to end the script without a word (a missing .dmg and
+# nothing on screen). Say which line failed.
+trap 'printf "\033[1;31merror:\033[0m the build stopped at line %s: %s\n" "$LINENO" "$BASH_COMMAND" >&2' ERR
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
@@ -39,7 +43,7 @@ for arg in "$@"; do
     --run) RUN=1 ;;
     --no-dmg) DMG=0 ;;
     --clean) CLEAN=1 ;;
-    -h|--help) sed -n '2,19p' "$0"; exit 0 ;;
+    -h|--help) awk 'NR > 1 && /^#/ { sub(/^# ?/, ""); print; next } NR > 1 { exit }' "$0"; exit 0 ;;
     *) echo "Unknown option: $arg (see --help)" >&2; exit 2 ;;
   esac
 done
@@ -81,8 +85,14 @@ lipo -info "$BIN"
 
 # ---------------------------------------------------------------- .app
 step "Assembling $APP_NAME.app"
-APP="$DIST/$APP_NAME.app"
-rm -rf "$APP"
+# The .app is assembled and signed in a temporary folder, not in dist/: a checkout in iCloud Drive
+# (~/Library/Mobile Documents) or Dropbox gets Finder attributes (com.apple.FinderInfo) on its
+# folders, and codesign refuses a bundle that carries them. The signed app is copied to dist/ at the end.
+mkdir -p "$DIST"
+STAGE="$(mktemp -d "${TMPDIR:-/tmp}/glyphra-app.XXXXXX")"
+trap 'rm -rf "${STAGE:-}"' EXIT
+APP="$STAGE/$APP_NAME.app"
+FINAL_APP="$DIST/$APP_NAME.app"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN" "$APP/Contents/MacOS/$BIN_NAME"
 chmod +x "$APP/Contents/MacOS/$BIN_NAME"
@@ -132,6 +142,7 @@ cat > "$APP/Contents/Info.plist" <<PLIST
 PLIST
 printf 'APPL????' > "$APP/Contents/PkgInfo"
 plutil -lint "$APP/Contents/Info.plist" >/dev/null
+xattr -cr "$APP" 2>/dev/null || true # no Finder info, quarantine flags or resource forks in the bundle
 
 # ---------------------------------------------------------------- sign
 if [[ -n "${APPLE_SIGNING_IDENTITY:-}" ]]; then
@@ -163,6 +174,10 @@ cleanup_dmg() {
   if [[ -n "$DEVICE" ]]; then eject_device "$DEVICE" || true; fi
   if [[ -n "$WORK" ]]; then rm -rf "$WORK"; fi
 }
+cleanup_all() {
+  cleanup_dmg
+  rm -rf "${STAGE:-}"
+}
 
 if [[ $DMG -eq 1 ]]; then
   DMG_PATH="$DIST/$APP_NAME-$VERSION-macos-$ARCH_LABEL.dmg"
@@ -170,11 +185,16 @@ if [[ $DMG -eq 1 ]]; then
   BG="${DMG_BACKGROUND:-$ROOT/packaging/macos/dmg-background.png}" # 640x400
   BG2X="${BG%.png}@2x.png"                                         # optional 1280x800 for Retina
   WIN_W=640 WIN_H=400
+  TITLEBAR=28 # the window bounds include the title bar; the picture is WIN_H high below it
+  # Finder counts an icon's position from the top of the window, title bar included, so an icon
+  # meant for the arrow's height (y=200 in the picture) is placed higher: ICON_Y = 200 - 45.
+  # If the icons look too high or too low on your macOS version, change ICON_Y.
+  ICON_Y="${DMG_ICON_Y:-155}"
   MACOS_MAJOR="$(sw_vers -productVersion | cut -d. -f1)"
   if [[ "$MACOS_MAJOR" -ge 26 ]]; then IMG=diskutil; else IMG=hdiutil; fi
   step "Creating $(basename "$DMG_PATH") with $IMG"
 
-  trap cleanup_dmg EXIT
+  trap cleanup_all EXIT
   WORK="$(mktemp -d "${TMPDIR:-/tmp}/glyphra-dmg.XXXXXX")"
   RW="$WORK/$APP_NAME-rw.dmg"
 
@@ -191,7 +211,7 @@ if [[ $DMG -eq 1 ]]; then
   APP_MB="$(du -sm "$APP" | awk '{print $1}')"
   SIZE_MB=$((APP_MB + APP_MB / 5 + 20))
   if [[ "$IMG" == diskutil ]]; then
-    diskutil image create blank --size "${SIZE_MB}m" --volumeName "$VOL" "$RW" >/dev/null
+    diskutil image create blank --size "${SIZE_MB}m" --volumeName "$VOL" "$RW" >/dev/null || die "diskutil could not create the disk image"
   else
     hdiutil create -quiet -size "${SIZE_MB}m" -fs HFS+ -volname "$VOL" "$RW" 2>&1 | grep -v "deprecated" || true
   fi
@@ -199,9 +219,9 @@ if [[ $DMG -eq 1 ]]; then
 
   # 2. Attach it browsable (Finder has to see it to save the window layout).
   if [[ "$IMG" == diskutil ]]; then
-    ATTACH_OUT="$(diskutil image attach "$RW")"
+    ATTACH_OUT="$(diskutil image attach "$RW" 2>&1)" || die "could not attach the disk image: $ATTACH_OUT"
   else
-    ATTACH_OUT="$(hdiutil attach "$RW" -noautoopen -noverify)"
+    ATTACH_OUT="$(hdiutil attach "$RW" -noautoopen -noverify 2>&1)" || die "could not attach the disk image: $ATTACH_OUT"
   fi
   DEVICE="$(echo "$ATTACH_OUT" | grep -E '^/dev/disk' | head -1 | awk '{print $1}' || true)"
   [[ -n "$DEVICE" ]] || die "could not attach the disk image: $ATTACH_OUT"
@@ -223,11 +243,14 @@ if [[ $DMG -eq 1 ]]; then
   if [[ "${DMG_LAYOUT:-1}" != 0 ]]; then
     [[ -f "$BG" ]] || die "no background image at $BG (set DMG_BACKGROUND, or DMG_LAYOUT=0)"
     mkdir "$MNT/.background"
-    if [[ -f "$BG2X" ]] && command -v tiffutil >/dev/null; then
-      # one file with both sizes: Finder picks the sharp one on Retina screens
-      tiffutil -cathidpicheck "$BG" "$BG2X" -out "$MNT/.background/background.tiff" >/dev/null 2>&1
+    # One file with both sizes: Finder picks the sharp one on Retina screens. tiffutil only joins
+    # a 72 dpi and a 144 dpi picture (tools/gen_dmg_background.sh writes them so); when it refuses,
+    # the 1x picture is used instead of stopping the build.
+    if [[ -f "$BG2X" ]] && command -v tiffutil >/dev/null \
+      && tiffutil -cathidpicheck "$BG" "$BG2X" -out "$MNT/.background/background.tiff" >/dev/null 2>&1; then
       BG_FILE="background.tiff"
     else
+      [[ -f "$BG2X" ]] && echo "Note: could not combine the 1x and 2x backgrounds; using the 1x picture (DPI of the PNGs: 72 and 144?)" >&2
       cp "$BG" "$MNT/.background/background.png"
       BG_FILE="background.png"
     fi
@@ -244,14 +267,14 @@ tell application "Finder"
     set current view of container window to icon view
     set toolbar visible of container window to false
     set statusbar visible of container window to false
-    set the bounds of container window to {100, 100, $((100 + WIN_W)), $((100 + WIN_H))}
+    set the bounds of container window to {100, 100, $((100 + WIN_W)), $((100 + WIN_H + TITLEBAR))}
     set opts to the icon view options of container window
     set arrangement of opts to not arranged
     set icon size of opts to 128
     set text size of opts to 13
     set background picture of opts to file ".background:$BG_FILE"
-    set position of item "$APP_NAME.app" of container window to {160, 200}
-    set position of item "Applications" of container window to {480, 200}
+    set position of item "$APP_NAME.app" of container window to {160, $ICON_Y}
+    set position of item "Applications" of container window to {480, $ICON_Y}
     update without registering applications
     delay 2
     close
@@ -279,7 +302,7 @@ APPLESCRIPT
   [[ -f "$DMG_PATH" ]] || die "could not compress $DMG_PATH"
   cleanup_dmg
   WORK=""
-  trap - EXIT
+  trap 'rm -rf "${STAGE:-}"' EXIT
 
   if [[ -n "${APPLE_SIGNING_IDENTITY:-}" ]]; then
     codesign --force --timestamp --sign "$APPLE_SIGNING_IDENTITY" "$DMG_PATH"
@@ -294,10 +317,15 @@ APPLESCRIPT
   (cd "$DIST" && shasum -a 256 "$(basename "$DMG_PATH")" > "$(basename "$DMG_PATH").sha256")
 fi
 
+# The signed app goes to dist/ without extended attributes, so it stays valid there.
+step "Copying $APP_NAME.app to dist/"
+rm -rf "$FINAL_APP"
+ditto --norsrc --noextattr "$APP" "$FINAL_APP"
+
 step "Done"
-echo "  App: $APP"
+echo "  App: $FINAL_APP"
 [[ $DMG -eq 1 ]] && echo "  DMG: $DMG_PATH"
 
 if [[ $RUN -eq 1 ]]; then
-  open "$APP"
+  open "$FINAL_APP"
 fi

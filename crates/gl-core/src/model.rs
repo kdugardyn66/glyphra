@@ -35,7 +35,7 @@ pub fn templates_that_fit(width: f32, height: f32) -> usize {
     let rows = (((height - PAGER + ROW_GAP) / row).floor().max(1.0)) as usize;
     columns * rows
 }
-/// Files this app opens in version 0.1.0 (the editor comes in 0.2.0).
+/// Files this app opens in version 0.1.2 (the editor comes in 0.2.0).
 pub const OPENABLE: [&str; 3] = ["md", "markdown", "txt"];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

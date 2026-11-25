@@ -13,8 +13,8 @@
   "Desktop development with C++" workload of Visual Studio Build Tools
   (the linker and the Windows SDK come with that workload). At run time Glyphra needs the
   WebView2 runtime, which Windows 11 and current Windows 10 have already.
-  For -Msi:  dotnet tool install --global wix
-             wix extension add --global WixToolset.UI.wixext
+  For -Msi:  dotnet tool install --global wix --version 5.0.2
+             wix extension add --global WixToolset.UI.wixext/5.0.2
   Optional code signing: set GLYPHRA_SIGN_CERT (path to .pfx) and GLYPHRA_SIGN_PASSWORD.
 #>
 [CmdletBinding()]
@@ -79,12 +79,12 @@ Remove-Item -Recurse -Force $Stage
 # MSI installer (WiX v4 or later)
 if ($Msi) {
   $wix = Get-Command wix -ErrorAction SilentlyContinue
-  if (-not $wix) { Die 'WiX CLI not found: dotnet tool install --global wix' }
+  if (-not $wix) { Die 'WiX CLI not found: dotnet tool install --global wix --version 5.0.2' }
   $MsiPath = Join-Path $Dist "$Base.msi"
   Step "Creating $(Split-Path -Leaf $MsiPath)"
   # MSI versions are numeric only: strip any pre-release suffix (0.2.0-beta.1 → 0.2.0).
   $MsiVersion = ($Version -split '-')[0]
-  & $wix.Source build -arch $Arch -ext WixToolset.UI.wixext `
+  & $wix.Source build -arch $Arch -ext WixToolset.UI.wixext/5.0.2 `
     -d "Version=$MsiVersion" `
     -d "Exe=$Exe" `
     -d "Icon=$Root\packaging\windows\glyphra.ico" `

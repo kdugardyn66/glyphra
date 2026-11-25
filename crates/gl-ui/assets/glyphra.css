@@ -1,4 +1,4 @@
-/* Glyphra 0.1.0. Colours are CSS variables (rule: never hard-code a colour in a component).
+/* Glyphra 0.1.2. Colours are CSS variables (rule: never hard-code a colour in a component).
    Themes: Modern, Solarized and Plus, each light and dark (palettes follow the VS Code themes of
    those names). data-theme = a theme id, or "auto": then the operating system's light/dark
    appearance picks between data-light and data-dark (the chosen light and dark theme ids). */

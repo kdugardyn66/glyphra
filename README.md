@@ -3,7 +3,7 @@
 Markdown documents and presentations in one workspace, with AI and team
 collaboration. Rust and Dioxus; macOS, Linux and Windows.
 
-**Version 0.1.0** — the start screen and the left menu bar:
+**Version 0.1.2** — the start screen and the left menu bar:
 
 - **Home**: Create new (Document, Presentation) and your recent files
 - **Open**: recent folders and Browse
@@ -30,7 +30,7 @@ folder (`GLYPHRA_CONFIG_DIR` overrides it); new documents go to `~/Documents/Gly
 ## Build packages
 
 ```
-./build.sh                 # on macOS: Glyphra.app and Glyphra-0.1.0-macos-<arch>.dmg in dist/
+./build.sh                 # on macOS: Glyphra.app and Glyphra-0.1.2-macos-<arch>.dmg in dist/
 ./build.sh --universal     # Apple silicon + Intel in one binary
 ./build.sh --no-dmg        # the .app only
 ./build.sh --run           # build and open the app

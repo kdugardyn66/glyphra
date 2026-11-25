@@ -42,8 +42,13 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          dotnet tool install --global wix
-          wix extension add --global WixToolset.UI.wixext
+          # WiX 5.0.2: the tool and its UI extension must be the same version (newer releases
+          # carry the Open Source Maintenance Fee terms)
+          dotnet tool install --global wix --version 5.0.2
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          wix extension add --global WixToolset.UI.wixext/5.0.2
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          wix extension list --global
           ./scripts/build-windows.ps1 -Msi
       - uses: actions/upload-artifact@v6
         with: { name: "glyphra-${{ matrix.os }}", path: "dist/*" }

@@ -1,0 +1,19 @@
+[package]
+name = "gl-store"
+description = "Settings, recent files and folders, files and API keys (no UI)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+directories = "6"
+aes-gcm = "0.10"
+base64 = "0.22"
+
+
+[dev-dependencies]
+tempfile.workspace = true

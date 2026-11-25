@@ -1,0 +1,33 @@
+# Server side of Glyphra (collaboration, from version 0.5). The desktop app does not need it.
+# Only nginx and PostgreSQL exist today; the application server is added when the
+# `glyphra-server` crate does. Copy .env.example to .env and set the password first.
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: glyphra
+      POSTGRES_USER: glyphra
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U glyphra -d glyphra"]
+      interval: 10s
+      retries: 5
+
+  # glyphra-server:            # added with the collaboration server
+  #   build: { context: .., dockerfile: deploy/Dockerfile.server }
+  #   depends_on: { postgres: { condition: service_healthy } }
+  #   environment:
+  #     DATABASE_URL: postgres://glyphra:${POSTGRES_PASSWORD}@postgres/glyphra
+
+  nginx:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    ports: ["8080:80"]
+    volumes:
+      - ./nginx/glyphra.conf:/etc/nginx/conf.d/default.conf:ro
+
+volumes:
+  pgdata:

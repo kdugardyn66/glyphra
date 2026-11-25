@@ -1,0 +1,15 @@
+{
+ "AI Chat": "Clavardage IA",
+ "The API key could not be saved (the encryption key file is not writable), so it is kept only until Glyphra closes.": "La clé d’API n’a pas pu être enregistrée (le fichier de la clé de chiffrement n’est pas accessible en écriture); elle est donc conservée uniquement jusqu’à la fermeture de Glyphra.",
+ "Write email": "Rédiger un courriel",
+ "Chat history": "Historique de clavardage",
+ "The expanded chat": "Le clavardage agrandi",
+ "Your AI Chat for documents": "Votre clavardage IA pour vos documents",
+ "Model for AI Chat. Switching keeps your provider and API key.": "Modèle du clavardage IA. Changer de modèle conserve votre fournisseur et votre clé d’API.",
+ "Chat tools": "Outils de clavardage",
+ "AI Chat can make mistakes. Check important info.": "Le clavardage IA peut faire des erreurs. Vérifiez les informations importantes.",
+ "Clear names, emails and phones": "Effacez les noms, courriels et numéros de téléphone",
+ "Work on documents together with your team: shared folders, comments and chat, on your own server.": "Travaillez à plusieurs sur vos documents : dossiers partagés, commentaires et clavardage, sur votre propre serveur.",
+ "Documents still open in their own tab; separate windows arrive with the editor.": "Les documents s’ouvrent toujours dans leur propre onglet; les fenêtres séparées arriveront avec l’éditeur.",
+ "Set up MCP servers and enable their tools for use in AI chat.": "Configurez des serveurs MCP et activez leurs outils pour le clavardage IA."
+}

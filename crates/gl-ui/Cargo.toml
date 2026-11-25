@@ -1,0 +1,17 @@
+[package]
+name = "gl-ui"
+description = "Glyphra's window: title bar and tabs, left menu bar, pages and the AI panel (Dioxus)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+gl-core.workspace = true
+gl-store.workspace = true
+gl-templates.workspace = true
+dioxus = { version = "0.7", features = ["desktop"] }
+tokio = { version = "1", features = ["rt", "time"] }
+rfd = "0.15"
+ureq = { version = "2", features = ["native-certs"] }

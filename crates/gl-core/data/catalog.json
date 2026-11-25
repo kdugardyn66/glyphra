@@ -1,0 +1,832 @@
+{
+  "updated": "2026-11-23",
+  "providers": [
+    {
+      "id": "alephalpha",
+      "name": "Aleph Alpha (PhariaAI)",
+      "region": "eu",
+      "country": "DE",
+      "protocol": "openai",
+      "base_url": "",
+      "needs_key": true,
+      "blurb": "Sovereign AI platform; connect your PhariaAI endpoint",
+      "help": "Aleph Alpha has no public sign-up: enter your company's PhariaAI inference URL and a token from PhariaOS.",
+      "endpoint_hint": "https://inference-api.your-company.example",
+      "models": [],
+      "models_api": {
+        "url": "{host}/models_available",
+        "auth": "bearer",
+        "format": "generic"
+      }
+    },
+    {
+      "id": "bfl",
+      "name": "Black Forest Labs (FLUX)",
+      "region": "eu",
+      "country": "DE",
+      "protocol": "bfl",
+      "base_url": "https://api.bfl.ai",
+      "needs_key": true,
+      "blurb": "FLUX image generation and editing",
+      "help": "Create a key at dashboard.bfl.ai › API keys. Images are billed in credits (1 credit = $0.01).",
+      "endpoint_hint": "",
+      "models": [
+        {
+          "id": "flux-2-pro",
+          "name": "FLUX.2 [pro]",
+          "input": null,
+          "output": null,
+          "note": "From $0.03 per megapixel",
+          "chat": false,
+          "recommended": true
+        },
+        {
+          "id": "flux-2-flex",
+          "name": "FLUX.2 [flex]",
+          "input": null,
+          "output": null,
+          "note": "$0.05 per megapixel",
+          "chat": false,
+          "recommended": false
+        },
+        {
+          "id": "flux-2-max",
+          "name": "FLUX.2 [max]",
+          "input": null,
+          "output": null,
+          "note": "From $0.07 per megapixel",
+          "chat": false,
+          "recommended": false
+        },
+        {
+          "id": "flux-kontext-pro",
+          "name": "FLUX.1 Kontext [pro]",
+          "input": null,
+          "output": null,
+          "note": "$0.04 per image",
+          "chat": false,
+          "recommended": false
+        },
+        {
+          "id": "flux-kontext-max",
+          "name": "FLUX.1 Kontext [max]",
+          "input": null,
+          "output": null,
+          "note": "$0.08 per image",
+          "chat": false,
+          "recommended": false
+        },
+        {
+          "id": "flux-pro-1.1-ultra",
+          "name": "FLUX1.1 [pro] Ultra",
+          "input": null,
+          "output": null,
+          "note": "$0.06 per image",
+          "chat": false,
+          "recommended": false
+        }
+      ],
+      "models_api": {
+        "url": "{base}/v1/models",
+        "auth": "bearer",
+        "format": "generic"
+      }
+    },
+    {
+      "id": "deepl",
+      "name": "DeepL",
+      "region": "eu",
+      "country": "DE",
+      "protocol": "deepl",
+      "base_url": "https://api.deepl.com",
+      "needs_key": true,
+      "blurb": "Translation and text improvement",
+      "help": "Create a key at deepl.com › Account › API keys. Free keys (ending in :fx) use api-free.deepl.com automatically.",
+      "endpoint_hint": "",
+      "models": [
+        {
+          "id": "quality_optimized",
+          "name": "DeepL next-gen (best quality)",
+          "input": null,
+          "output": null,
+          "note": "Per character of source text (see your DeepL API plan)",
+          "chat": true,
+          "recommended": true
+        },
+        {
+          "id": "latency_optimized",
+          "name": "DeepL classic (fastest)",
+          "input": null,
+          "output": null,
+          "note": "Per character of source text (see your DeepL API plan)",
+          "chat": false,
+          "recommended": false
+        }
+      ],
+      "models_api": {
+        "url": "{base}/v2/languages?type=target",
+        "auth": "header",
+        "format": "key_check",
+        "auth_name": "Authorization",
+        "auth_prefix": "DeepL-Auth-Key "
+      }
+    },
+    {
+      "id": "mistral",
+      "name": "Mistral AI",
+      "region": "eu",
+      "country": "FR",
+      "protocol": "openai",
+      "base_url": "https://api.mistral.ai/v1",
+      "needs_key": true,
+      "blurb": "Mistral Large, Medium, Small and Codestral",
+      "help": "Create a key at console.mistral.ai › API keys.",
+      "endpoint_hint": "",
+      "models": [
+        {
+          "id": "mistral-large-latest",
+          "name": "Mistral Large 4",
+          "input": 0.7,
+          "output": 2.1,
+          "note": "",
+          "chat": true,
+          "recommended": true
+        },
+        {
+          "id": "mistral-medium-latest",
+          "name": "Mistral Medium 3.5",
+          "input": 1.5,
+          "output": 7.5,
+          "note": "",
+          "chat": true,
+          "recommended": false
+        },
+        {
+          "id": "mistral-small-latest",
+          "name": "Mistral Small 4",
+          "input": 0.15,
+          "output": 0.6,
+          "note": "",
+          "chat": true,
+          "recommended": false
+        },
+        {
+          "id": "codestral-latest",
+          "name": "Codestral",
+          "input": 0.3,
+          "output": 0.9,
+          "note": "",
+          "chat": true,
+          "recommended": false
+        }
+      ],
+      "models_api": {
+        "url": "{base}/models",
+        "auth": "bearer",
+        "format": "openai"
+      }
+    },
+    {
+      "id": "alibaba",
+      "name": "Alibaba Cloud (Qwen)",
+      "region": "apac",
+      "country": "CN",
+      "protocol": "openai",
+      "base_url": "https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
+      "needs_key": true,
+      "blurb": "Qwen models on Model Studio (international)",
+      "help": "Create a key in Alibaba Cloud Model Studio (international, Singapore). New accounts get a free quota.",
+      "endpoint_hint": "",
+      "models": [
+        {
+          "id": "qwen4-max",
+          "name": "Qwen4 Max",
+          "input": 1.5,
+          "output": 4.5,
+          "note": "",
+          "chat": true,
+          "recommended": true
+        },
+        {
+          "id": "qwen3.8-max",
+          "name": "Qwen3.8 Max",
+          "input": 2.0,
+          "output": 6.0,
+          "note": "",
+          "chat": true,
+          "recommended": false
+        },
+        {
+          "id": "qwen3.7-plus",
+          "name": "Qwen3.7 Plus",
+          "input": 0.4,
+          "output": 1.6,
+          "note": "",
+          "chat": true,
+          "recommended": false
+        }
+      ],
+      "models_api": {
+        "url": "{base}/models",
+        "auth": "bearer",
+        "format": "openai"
+      }
+    },
+    {
+      "id": "deepseek",
+      "name": "DeepSeek",
+      "region": "apac",
+      "country": "CN",
+      "protocol": "openai",
+      "base_url": "https://api.deepseek.com",
+      "needs_key": true,
+      "blurb": "DeepSeek Flash and V4 Pro (prices shown are the peak-hour rates; off-peak is half)",
+      "help": "Create a key at platform.deepseek.com › API keys. Off-peak hours are half price.",
+      "endpoint_hint": "",
+      "models": [
+        {
+          "id": "deepseek-flash",
+          "name": "DeepSeek V4.1 Flash",
+          "input": 0.3,
+          "output": 1.2,
+          "note": "",
+          "chat": true,
+          "recommended": true
+        },
+        {
+          "id": "deepseek-v4-pro",
+          "name": "DeepSeek V4 Pro",
+          "input": 1.32,
+          "output": 3.96,
+          "note": "",
+          "chat": true,
+          "recommended": false
+        }
+      ],
+      "models_api": {
+        "url": "{base}/models",
+        "auth": "bearer",
+        "format": "openai"
+      }
+    },
+    {
+      "id": "moonshot",
+      "name": "Moonshot AI (Kimi)",
+      "region": "apac",
+      "country": "CN",
+      "protocol": "openai",
+      "base_url": "https://api.moonshot.ai/v1",
+      "needs_key": true,
+      "blurb": "Kimi K3 models",
+      "help": "Create a key at platform.kimi.ai (international keys don't work on the China platform).",
+      "endpoint_hint": "",
+      "models": [
+        {
+          "id": "kimi-k3.1-pro",
+          "name": "Kimi K3.1 Pro",
+          "input": 2.0,
+          "output": 10.0,
+          "note": "",
+          "chat": true,
+          "recommended": true
+        },
+        {
+          "id": "kimi-k3",
+          "name": "Kimi K3",
+          "input": 3.0,
+          "output": 15.0,
+          "note": "",
+          "chat": true,
+          "recommended": false
+        }
+      ],
+      "models_api": {
+        "url": "{base}/models",
+        "auth": "bearer",
+        "format": "openai"
+      }
+    },
+    {
+      "id": "sakana",
+      "name": "Sakana AI (Fugu)",
+      "region": "apac",
+      "country": "JP",
+      "protocol": "openai",
+      "base_url": "https://api.sakana.ai/v1",
+      "needs_key": true,
+      "blurb": "Fugu multi-model reasoning and Namazu",
+      "help": "Create a key at console.sakana.ai (it is shown only once). Not available in the EU, EEA, UK or Switzerland.",
+      "endpoint_hint": "",
+      "models": [
+        {
+          "id": "sakana-namazu",
+          "name": "Sakana Namazu",
+          "input": 0.95,
+          "output": 4.0,
+          "note": "",
+          "chat": true,
+          "recommended": true
+        },
+        {
+          "id": "fugu",
+          "name": "Fugu",
+          "input": null,
+          "output": null,
+          "note": "Subscription or pay-as-you-go (see console.sakana.ai)",
+          "chat": true,
+          "recommended": true
+        },
+        {
+          "id": "fugu-max",
+          "name": "Fugu Max",
+          "input": null,
+          "output": null,
+          "note": "Subscription or pay-as-you-go (see console.sakana.ai)",
+          "chat": true,
+          "recommended": false
+        },
+        {
+          "id": "fugu-ultra",
+          "name": "Fugu Ultra",
+          "input": null,
+          "output": null,
+          "note": "Subscription or pay-as-you-go (see console.sakana.ai)",
+          "chat": true,
+          "recommended": false
+        }
+      ],
+      "models_api": {
+        "url": "{base}/models",
+        "auth": "bearer",
+        "format": "openai"
+      }
+    },
+    {
+      "id": "zai",
+      "name": "Z.AI (GLM)",
+      "region": "apac",
+      "country": "CN",
+      "protocol": "openai",
+      "base_url": "https://api.z.ai/api/paas/v4",
+      "needs_key": true,
+      "blurb": "GLM models, including free ones",
+      "help": "Create a key at z.ai › API keys. GLM-4.7-Flash and GLM-4.5-Flash are free.",
+      "endpoint_hint": "",
+      "models": [
+        {
+          "id": "glm-5.3",
+          "name": "GLM-5.3",
+          "input": 1.4,
+          "output": 4.4,
+          "note": "",
+          "chat": true,
+          "recommended": true
+        },
+        {
+          "id": "glm-5.3-flashx",
+          "name": "GLM-5.3-FlashX",
+          "input": 0.37,
+          "output": 1.25,
+          "note": "",
+          "chat": true,
+          "recommended": false
+        },
+        {
+          "id": "glm-5.3-flash",
+          "name": "GLM-5.3-Flash",
+          "input": 0.15,
+          "output": 0.5,
+          "note": "",
+          "chat": true,
+          "recommended": false
+        },
+        {
+          "id": "glm-4.7-flash",
+          "name": "GLM-4.7-Flash",
+          "input": 0.0,
+          "output": 0.0,
+          "note": "",
+          "chat": true,
+          "recommended": false
+        },
+        {
+          "id": "glm-4.5-flash",
+          "name": "GLM-4.5-Flash",
+          "input": 0.0,
+          "output": 0.0,
+          "note": "",
+          "chat": true,
+          "recommended": false
+        }
+      ],
+      "models_api": {
+        "url": "{base}/models",
+        "auth": "bearer",
+        "format": "openai"
+      }
+    },
+    {
+      "id": "anthropic",
+      "name": "Anthropic (Claude)",
+      "region": "us",
+      "country": "US",
+      "protocol": "anthropic",
+      "base_url": "https://api.anthropic.com",
+      "needs_key": true,
+      "blurb": "Claude Fable, Opus, Sonnet and Haiku",
+      "help": "Create a key at platform.claude.com › API keys.",
+      "endpoint_hint": "",
+      "models": [
+        {
+          "id": "claude-fable-5-2",
+          "name": "Claude Fable 5.2",
+          "input": 8.0,
+          "output": 40.0,
+          "note": "",
+          "chat": true,
+          "recommended": false
+        },
+        {
+          "id": "claude-opus-5-5",
+          "name": "Claude Opus 5.5",
+          "input": 4.0,
+          "output": 20.0,
+          "note": "",
+          "chat": true,
+          "recommended": true
+        },
+        {
+          "id": "claude-sonnet-5-5",
+          "name": "Claude Sonnet 5.5",
+          "input": 2.0,
+          "output": 10.0,
+          "note": "",
+          "chat": true,
+          "recommended": false
+        },
+        {
+          "id": "claude-haiku-5-5",
+          "name": "Claude Haiku 5.5",
+          "input": 0.1,
+          "output": 0.5,
+          "note": "",
+          "chat": true,
+          "recommended": false
+        }
+      ],
+      "models_api": {
+        "url": "{base}/v1/models?limit=1000",
+        "auth": "header",
+        "format": "anthropic",
+        "auth_name": "x-api-key",
+        "headers": [
+          [
+            "anthropic-version",
+            "2023-06-01"
+          ]
+        ]
+      }
+    },
+    {
+      "id": "cohere",
+      "name": "Cohere (Command)",
+      "region": "us",
+      "country": "CA",
+      "protocol": "openai",
+      "base_url": "https://api.cohere.ai/compatibility/v1",
+      "needs_key": true,
+      "blurb": "Command A models for business",
+      "help": "Create a key at dashboard.cohere.com › API keys.",
+      "endpoint_hint": "",
+      "models": [
+        {
+          "id": "command-a-plus-05-2026",
+          "name": "Command A+",
+          "input": 0.3,
+          "output": 1.5,
+          "note": "",
+          "chat": true,
+          "recommended": true
+        },
+        {
+          "id": "command-a-reasoning-08-2025",
+          "name": "Command A Reasoning",
+          "input": null,
+          "output": null,
+          "note": "price on request",
+          "chat": true,
+          "recommended": false
+        },
+        {
+          "id": "command-r-08-2024",
+          "name": "Command R",
+          "input": 0.15,
+          "output": 0.6,
+          "note": "",
+          "chat": true,
+          "recommended": false
+        },
+        {
+          "id": "command-r7b-12-2024",
+          "name": "Command R7B",
+          "input": 0.0375,
+          "output": 0.15,
+          "note": "",
+          "chat": true,
+          "recommended": false
+        }
+      ],
+      "models_api": {
+        "url": "https://api.cohere.com/v1/models?page_size=1000",
+        "auth": "bearer",
+        "format": "cohere"
+      }
+    },
+    {
+      "id": "gemini",
+      "name": "Google Gemini",
+      "region": "us",
+      "country": "US",
+      "protocol": "gemini",
+      "base_url": "https://generativelanguage.googleapis.com",
+      "needs_key": true,
+      "blurb": "Gemini models through Google AI Studio (launch discounts end soon; list prices shown)",
+      "help": "Create a key in Google AI Studio (aistudio.google.com › Get API key).",
+      "endpoint_hint": "",
+      "models": [
+        {
+          "id": "gemini-4-argon",
+          "name": "Gemini 4 Argon",
+          "input": 4.0,
+          "output": 20.0,
+          "note": "",
+          "chat": true,
+          "recommended": true
+        },
+        {
+          "id": "gemini-3.8-flash",
+          "name": "Gemini 3.8 Flash",
+          "input": 1.5,
+          "output": 7.5,
+          "note": "",
+          "chat": true,
+          "recommended": false
+        },
+        {
+          "id": "gemini-3.5-flash",
+          "name": "Gemini 3.5 Flash",
+          "input": 1.5,
+          "output": 9.0,
+          "note": "",
+          "chat": true,
+          "recommended": false
+        },
+        {
+          "id": "gemini-3.1-pro-preview",
+          "name": "Gemini 3.1 Pro (preview)",
+          "input": 2.0,
+          "output": 12.0,
+          "note": "",
+          "chat": true,
+          "recommended": false
+        },
+        {
+          "id": "gemini-3.1-flash-lite",
+          "name": "Gemini 3.1 Flash-Lite",
+          "input": 0.25,
+          "output": 1.5,
+          "note": "",
+          "chat": true,
+          "recommended": false
+        }
+      ],
+      "models_api": {
+        "url": "{base}/v1beta/models?pageSize=1000",
+        "auth": "query",
+        "format": "google",
+        "auth_name": "key"
+      }
+    },
+    {
+      "id": "meta",
+      "name": "Meta (Muse)",
+      "region": "us",
+      "country": "US",
+      "protocol": "openai",
+      "base_url": "https://api.meta.ai/v1",
+      "needs_key": true,
+      "blurb": "Muse models through Meta's Model API",
+      "help": "Create a key at dev.meta.ai (Model API).",
+      "endpoint_hint": "",
+      "models": [
+        {
+          "id": "muse-wonder-1.0",
+          "name": "Muse Wonder 1.0",
+          "input": 4.0,
+          "output": 20.0,
+          "note": "",
+          "chat": true,
+          "recommended": false
+        },
+        {
+          "id": "muse-spark-1.3",
+          "name": "Muse Spark 1.3",
+          "input": 1.25,
+          "output": 4.25,
+          "note": "",
+          "chat": true,
+          "recommended": true
+        }
+      ],
+      "models_api": {
+        "url": "{base}/models",
+        "auth": "bearer",
+        "format": "openai"
+      }
+    },
+    {
+      "id": "microsoft",
+      "name": "Microsoft Foundry",
+      "region": "us",
+      "country": "US",
+      "protocol": "openai",
+      "base_url": "",
+      "needs_key": true,
+      "blurb": "MAI and OpenAI models in your Azure resource",
+      "help": "In Microsoft Foundry, deploy a model, then copy the resource endpoint and key. Use your deployment names as models.",
+      "endpoint_hint": "https://<resource>.openai.azure.com/openai/v1",
+      "models": [
+        {
+          "id": "MAI-Thinking-1",
+          "name": "MAI-Thinking-1 (preview)",
+          "input": 2.0,
+          "output": 8.0,
+          "note": "",
+          "chat": true,
+          "recommended": true
+        }
+      ],
+      "models_api": {
+        "url": "{host}/openai/v1/models",
+        "auth": "header",
+        "format": "openai",
+        "auth_name": "api-key"
+      }
+    },
+    {
+      "id": "openai",
+      "name": "OpenAI",
+      "region": "us",
+      "country": "US",
+      "protocol": "openai",
+      "base_url": "https://api.openai.com/v1",
+      "needs_key": true,
+      "blurb": "GPT models",
+      "help": "Create a key at platform.openai.com › API keys.",
+      "endpoint_hint": "",
+      "models": [
+        {
+          "id": "gpt-6.2-astra",
+          "name": "GPT-6.2 Astra",
+          "input": 8.0,
+          "output": 40.0,
+          "note": "",
+          "chat": true,
+          "recommended": false
+        },
+        {
+          "id": "gpt-6.2-sol",
+          "name": "GPT-6.2 Sol",
+          "input": 2.0,
+          "output": 10.0,
+          "note": "",
+          "chat": true,
+          "recommended": true
+        },
+        {
+          "id": "gpt-6.1-terra",
+          "name": "GPT-6.1 Terra",
+          "input": 1.0,
+          "output": 5.0,
+          "note": "",
+          "chat": true,
+          "recommended": false
+        },
+        {
+          "id": "gpt-6-luna",
+          "name": "GPT-6 Luna",
+          "input": 0.1,
+          "output": 0.5,
+          "note": "",
+          "chat": true,
+          "recommended": false
+        }
+      ],
+      "models_api": {
+        "url": "{base}/models",
+        "auth": "bearer",
+        "format": "openai"
+      }
+    },
+    {
+      "id": "xai",
+      "name": "SpaceX AI (Grok)",
+      "region": "us",
+      "country": "US",
+      "protocol": "openai",
+      "base_url": "https://api.x.ai/v1",
+      "needs_key": true,
+      "blurb": "Grok models (formerly xAI)",
+      "help": "Create a key at console.x.ai › API keys.",
+      "endpoint_hint": "",
+      "models": [
+        {
+          "id": "grok-4.7",
+          "name": "Grok 4.7",
+          "input": 2.0,
+          "output": 6.0,
+          "note": "",
+          "chat": true,
+          "recommended": true
+        },
+        {
+          "id": "grok-4.3",
+          "name": "Grok 4.3",
+          "input": 1.25,
+          "output": 2.5,
+          "note": "",
+          "chat": true,
+          "recommended": false
+        },
+        {
+          "id": "grok-build-0.1",
+          "name": "Grok Build 0.1",
+          "input": 1.0,
+          "output": 2.0,
+          "note": "",
+          "chat": true,
+          "recommended": false
+        }
+      ],
+      "models_api": {
+        "url": "{base}/models",
+        "auth": "bearer",
+        "format": "openai"
+      }
+    },
+    {
+      "id": "lmstudio",
+      "name": "LM Studio (local)",
+      "region": "local",
+      "country": "",
+      "protocol": "openai",
+      "base_url": "http://localhost:1234/v1",
+      "needs_key": false,
+      "blurb": "Models running in LM Studio on this computer",
+      "help": "In LM Studio, load a model and start the local server (Developer › Start Server, port 1234).",
+      "endpoint_hint": "",
+      "models": [],
+      "models_api": {
+        "url": "{base}/models",
+        "auth": "bearer",
+        "format": "openai"
+      }
+    },
+    {
+      "id": "ollama",
+      "name": "Ollama (local)",
+      "region": "local",
+      "country": "",
+      "protocol": "openai",
+      "base_url": "http://localhost:11434/v1",
+      "needs_key": false,
+      "blurb": "Models running in Ollama on this computer",
+      "help": "Install Ollama, then `ollama pull <model>`; it listens on port 11434.",
+      "endpoint_hint": "",
+      "models": [],
+      "models_api": {
+        "url": "{host}/api/tags",
+        "auth": "none",
+        "format": "ollama"
+      }
+    },
+    {
+      "id": "openai-compatible",
+      "name": "OpenAI-compatible endpoint",
+      "region": "local",
+      "country": "",
+      "protocol": "openai",
+      "base_url": "http://localhost:8000/v1",
+      "needs_key": false,
+      "blurb": "vLLM, llama.cpp, LocalAI, OpenRouter, ...",
+      "help": "Any server with /v1/chat/completions; add a key if it needs one.",
+      "endpoint_hint": "",
+      "models": [],
+      "models_api": {
+        "url": "{host}/v1/models",
+        "auth": "bearer",
+        "format": "openai"
+      }
+    }
+  ]
+}

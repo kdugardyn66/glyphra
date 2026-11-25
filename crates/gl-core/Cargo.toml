@@ -1,0 +1,20 @@
+[package]
+name = "gl-core"
+description = "Glyphra's model: pages, tabs, templates, settings and AI model profiles. Knows nothing about the UI."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+gl-store.workspace = true
+gl-templates.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sys-locale = "0.3"
+pulldown-cmark = { version = "0.13", default-features = false, features = ["html"] }
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+
+[dev-dependencies]
+tempfile.workspace = true

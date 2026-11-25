@@ -1,0 +1,9 @@
+# Keep line endings as LF on every system. Without this, Git on Windows turns the template
+# files into CRLF when checking out, and tests and packaged templates see "\r\n".
+* text=auto eol=lf
+*.png binary
+*.ico binary
+*.icns binary
+*.xlsx binary
+*.gz binary
+*.zip binary

@@ -405,7 +405,7 @@ mod tests {
         assert_eq!(ids.len(), all().len());
         for t in all() {
             assert!(t.source.trim().len() > 20, "{} is empty", t.id);
-            assert!(t.source.starts_with("---\n"), "{} has no front matter", t.id);
+            assert!(t.source.replace("\r\n", "\n").starts_with("---\n"), "{} has no front matter", t.id);
             assert!(t.source.contains(&format!("theme: {}", t.theme)), "{}: theme differs from the catalogue", t.id);
         }
     }

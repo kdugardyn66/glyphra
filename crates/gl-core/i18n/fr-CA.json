@@ -1,7 +1,6 @@
 {
  "AI Chat": "Clavardage IA",
  "The API key could not be saved (the encryption key file is not writable), so it is kept only until Glyphra closes.": "La clé d’API n’a pas pu être enregistrée (le fichier de la clé de chiffrement n’est pas accessible en écriture); elle est donc conservée uniquement jusqu’à la fermeture de Glyphra.",
- "Write email": "Rédiger un courriel",
  "Chat history": "Historique de clavardage",
  "The expanded chat": "Le clavardage agrandi",
  "Your AI Chat for documents": "Votre clavardage IA pour vos documents",

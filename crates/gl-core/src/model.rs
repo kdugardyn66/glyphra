@@ -35,7 +35,7 @@ pub fn templates_that_fit(width: f32, height: f32) -> usize {
     let rows = (((height - PAGER + ROW_GAP) / row).floor().max(1.0)) as usize;
     columns * rows
 }
-/// Files this app opens in version 0.1.2 (the editor comes in 0.2.0).
+/// Files this app opens in version 0.1.3 (the editor comes in 0.2.0).
 pub const OPENABLE: [&str; 3] = ["md", "markdown", "txt"];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -46,6 +46,7 @@ pub enum Page {
     Collaboration,
     AiTools,
     Settings,
+    Help,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -76,10 +77,78 @@ impl SettingsSection {
     }
 }
 
+/// The topics of the manual, in the order of the list at the left of the Help page: Glyphra
+/// itself, its pages, and under Settings its five parts.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum HelpTopic {
+    Glyphra,
+    AiChat,
+    Home,
+    Open,
+    Templates,
+    Collaboration,
+    AiTools,
+    Help,
+    Settings,
+    General,
+    Region,
+    AiModels,
+    ModelAssignment,
+    McpServers,
+}
+
+impl HelpTopic {
+    pub const ALL: [HelpTopic; 14] = [
+        HelpTopic::Glyphra,
+        HelpTopic::AiChat,
+        HelpTopic::Home,
+        HelpTopic::Open,
+        HelpTopic::Templates,
+        HelpTopic::Collaboration,
+        HelpTopic::AiTools,
+        HelpTopic::Help,
+        HelpTopic::Settings,
+        HelpTopic::General,
+        HelpTopic::Region,
+        HelpTopic::AiModels,
+        HelpTopic::ModelAssignment,
+        HelpTopic::McpServers,
+    ];
+    pub fn label(self) -> &'static str {
+        match self {
+            HelpTopic::Glyphra => tx("Glyphra"),
+            HelpTopic::AiChat => tx("AI Chat"),
+            HelpTopic::Home => tx("Home"),
+            HelpTopic::Open => tx("Open"),
+            HelpTopic::Templates => tx("Templates"),
+            HelpTopic::Collaboration => tx("Collaboration"),
+            HelpTopic::AiTools => tx("AI Tools"),
+            HelpTopic::Help => tx("Help"),
+            HelpTopic::Settings => tx("Settings"),
+            HelpTopic::General => tx("General"),
+            HelpTopic::Region => tx("Region"),
+            HelpTopic::AiModels => tx("AI Models"),
+            HelpTopic::ModelAssignment => tx("Model Assignment"),
+            HelpTopic::McpServers => tx("MCP Servers"),
+        }
+    }
+    /// How far the topic is indented in the list: 0 for Glyphra, 1 for its pages and Settings,
+    /// 2 for the parts of Settings.
+    pub fn depth(self) -> u8 {
+        match self {
+            HelpTopic::Glyphra => 0,
+            HelpTopic::General | HelpTopic::Region | HelpTopic::AiModels | HelpTopic::ModelAssignment | HelpTopic::McpServers => 2,
+            _ => 1,
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Command {
     ShowPage(Page),
     OpenSettings(SettingsSection),
+    /// The Help page, at this topic.
+    OpenHelp(HelpTopic),
     ToggleAiPanel,
     NewDocument(Kind),
     NewFromTemplate(String),
@@ -90,6 +159,30 @@ pub enum Command {
     OpenInChat(PathBuf),
     /// Take a file off the AI Chat's attachments.
     DetachFromChat(PathBuf),
+    /// Send a message in the current chat (a new one when none is open).
+    SendChat(String),
+    /// Send the last message again after a failure.
+    RetryChat,
+    /// One of the prompts above the message box (index in `chat::CHIPS`).
+    ChatChip(usize),
+    /// A tool from the AI Tools catalogue, run in the chat on the current document (by title).
+    RunChatTool(String),
+    /// The answer to `Effect::Chat`: the text of the answer, or why it failed.
+    ChatReplied {
+        chat: String,
+        result: Result<String, String>,
+    },
+    NewChat,
+    OpenChat(String),
+    DeleteChat(String),
+    ClearChats,
+    /// Whether the document you are looking at is sent along with your messages.
+    ToggleChatDocument,
+    ToggleChatExpanded,
+    /// "Attach a file…" in the chat: ask for a file to attach.
+    ChooseChatFile,
+    /// A file chosen for the chat.
+    AttachToChat(PathBuf),
     /// Home: show the file in the file manager.
     RevealPath(PathBuf),
     /// Home: pin or unpin a file in the list.
@@ -169,6 +262,15 @@ pub enum Effect {
     },
     /// Show this file (or folder) in the file manager.
     Reveal(PathBuf),
+    /// Send this request to the model of the chat and answer with `Command::ChatReplied`.
+    Chat {
+        chat: String,
+        request: crate::models_api::Request,
+    },
+    /// Ask for a file to attach to the chat; the answer is `Command::AttachToChat`.
+    ChooseChatFile {
+        start: PathBuf,
+    },
     Quit,
 }
 
@@ -238,6 +340,11 @@ pub struct AddModelForm {
 }
 
 /// Where a provider's API key is kept (one key for all of its models).
+/// Seconds since 1970.
+fn unix_now() -> u64 {
+    std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0)
+}
+
 fn provider_key_name(provider: &str) -> String {
     format!("ai.provider.{provider}")
 }
@@ -315,9 +422,24 @@ pub struct AppModel {
     pub tabs: Vec<Tab>,
     /// Files attached to the AI Chat (shown above the message box).
     pub chat_files: Vec<PathBuf>,
+    /// The conversations, newest first, and the one showing (none: a new one starts with the next message).
+    pub chats: Vec<crate::chat::Chat>,
+    pub chat_current: Option<String>,
+    /// The conversation waiting for an answer.
+    pub chat_busy: Option<String>,
+    /// The API the waiting question was sent to (the model may be switched while waiting).
+    chat_sent_to: Protocol,
+    /// Why the last question failed (shown under the conversation with "Try again").
+    pub chat_error: Option<String>,
+    /// Send the document you are looking at along with your messages.
+    pub chat_use_document: bool,
+    /// The panel is wide.
+    pub chat_expanded: bool,
     /// `Some(i)`: tab `i` is in front instead of a page.
     pub active_tab: Option<usize>,
     pub section: SettingsSection,
+    /// The topic showing on the Help page.
+    pub help: HelpTopic,
     pub draft: GeneralDraft,
     pub templates: TemplatesState,
     pub add_model: Option<AddModelForm>,
@@ -375,8 +497,16 @@ impl AppModel {
             page: Page::Home,
             tabs: Vec::new(),
             chat_files: Vec::new(),
+            chats: crate::chat::load(&dir),
+            chat_current: None,
+            chat_busy: None,
+            chat_sent_to: Protocol::OpenAiChat,
+            chat_error: None,
+            chat_use_document: true,
+            chat_expanded: false,
             active_tab: None,
             section: SettingsSection::General,
+            help: HelpTopic::Glyphra,
             templates: TemplatesState {
                 filter: Filter { kind: Some(Kind::Document), ..Default::default() },
                 page: 0,
@@ -403,6 +533,10 @@ impl AppModel {
                 self.show_page(Page::Settings);
                 self.section = s;
             }
+            Command::OpenHelp(topic) => {
+                self.show_page(Page::Help);
+                self.help = topic;
+            }
             Command::ToggleAiPanel => {
                 self.settings.ai_panel_open = !self.settings.ai_panel_open;
                 self.save_settings();
@@ -419,6 +553,55 @@ impl AppModel {
             Command::OpenPath(p) => self.open_path(&p),
             Command::OpenInChat(p) => self.attach_to_chat(p),
             Command::DetachFromChat(p) => self.chat_files.retain(|f| *f != p),
+            Command::AttachToChat(p) => self.attach_to_chat(p),
+            Command::ChooseChatFile => return vec![Effect::ChooseChatFile { start: self.settings.documents_dir.clone() }],
+            Command::SendChat(text) => return self.send_chat(&text, None),
+            Command::RetryChat => return self.retry_chat(),
+            Command::ChatChip(i) => {
+                if let Some(chip) = crate::chat::CHIPS.get(i) {
+                    let shown = t(chip.label);
+                    return self.send_prompt(chip.prompt, chip.needs, shown);
+                }
+            }
+            Command::RunChatTool(title) => {
+                if let Some(tool) = crate::chat::tool(&title) {
+                    let shown = t(&title);
+                    return self.send_prompt(tool.prompt, tool.needs, shown);
+                }
+            }
+            Command::ChatReplied { chat, result } => self.chat_replied(&chat, result),
+            Command::NewChat => {
+                if self.chat_busy.is_none() {
+                    self.chat_current = None;
+                    self.chat_error = None;
+                }
+            }
+            Command::OpenChat(id) => {
+                if self.chat_busy.is_none() && self.chats.iter().any(|c| c.id == id) {
+                    self.chat_current = Some(id);
+                    self.chat_error = None;
+                }
+            }
+            Command::DeleteChat(id) => {
+                if self.chat_busy.as_deref() != Some(&id) {
+                    self.chats.retain(|c| c.id != id);
+                    if self.chat_current.as_deref() == Some(&id) {
+                        self.chat_current = None;
+                        self.chat_error = None;
+                    }
+                    self.save_chats();
+                }
+            }
+            Command::ClearChats => {
+                if self.chat_busy.is_none() {
+                    self.chats.clear();
+                    self.chat_current = None;
+                    self.chat_error = None;
+                    self.save_chats();
+                }
+            }
+            Command::ToggleChatDocument => self.chat_use_document = !self.chat_use_document,
+            Command::ToggleChatExpanded => self.chat_expanded = !self.chat_expanded,
             Command::RevealPath(p) => {
                 if p.exists() {
                     return vec![Effect::Reveal(p)];
@@ -489,7 +672,9 @@ impl AppModel {
 
     /// The AI panel on the right is showing.
     pub fn ai_panel_visible(&self) -> bool {
-        self.settings.ai_enabled && self.settings.ai_panel_open && (self.active_tab.is_some() || self.page != Page::Settings)
+        self.settings.ai_enabled
+            && self.settings.ai_panel_open
+            && (self.active_tab.is_some() || !matches!(self.page, Page::Settings | Page::Help))
     }
 
     // ------------------------------------------------------------------ messages
@@ -726,6 +911,205 @@ impl AppModel {
             Err(e) => {
                 self.error(tr("Could not create “{path}”: {error}", &[("path", &path.display().to_string()), ("error", &e.to_string())]))
             }
+        }
+    }
+
+    // ------------------------------------------------------------------ AI Chat
+
+    fn save_chats(&mut self) {
+        self.chats.truncate(crate::chat::MAX_CHATS);
+        if let Ok(text) = serde_json::to_vec_pretty(&self.chats) {
+            // not being able to keep the history is no reason to bother you
+            let _ = atomic_write(&self.store.dir().join(crate::chat::FILE), &text);
+        }
+    }
+
+    /// The wire protocol of a connected model's provider.
+    fn chat_protocol(&self, provider: &str) -> Protocol {
+        providers::get(provider)
+            .map(|p| p.protocol)
+            .or_else(|| {
+                provider
+                    .strip_prefix("custom:")
+                    .and_then(|n| self.settings.custom_providers.iter().find(|c| c.name == n))
+                    .and_then(|c| Protocol::from_id(&c.protocol))
+            })
+            .unwrap_or(Protocol::OpenAiChat)
+    }
+
+    /// The texts the model gets to work on: the document you are looking at (if switched on) and
+    /// the attached files. Files that cannot be read as text are left out and reported.
+    fn chat_context(&mut self) -> Vec<crate::chat::Context> {
+        let mut out = Vec::new();
+        if self.chat_use_document
+            && let Some(tab) = self.active_tab.and_then(|i| self.tabs.get(i))
+        {
+            out.push(crate::chat::Context { name: tab.title.clone(), text: tab.content.clone() });
+        }
+        let mut unreadable = Vec::new();
+        for path in &self.chat_files {
+            let name = path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
+            // a file open in a tab is already there
+            if out.iter().any(|c| c.name == name && self.tabs.iter().any(|t| t.path == *path)) {
+                continue;
+            }
+            match std::fs::read_to_string(path) {
+                Ok(text) => out.push(crate::chat::Context { name, text }),
+                Err(_) => unreadable.push(name),
+            }
+        }
+        if !unreadable.is_empty() {
+            self.notify(
+                NoticeKind::Error,
+                tr("These files could not be read as text and were not sent: {names}", &[("names", &unreadable.join(", "))]),
+            );
+        }
+        out
+    }
+
+    /// A prompt of the chat's chips or tools: needs a document (or two) to work on.
+    fn send_prompt(&mut self, prompt: &str, needs: crate::chat::Needs, shown: String) -> Vec<Effect> {
+        use crate::chat::Needs;
+        let documents = self.chat_context_count();
+        let missing = match needs {
+            Needs::Nothing => None,
+            Needs::Document if documents == 0 => Some(t("Open a document or attach a file first, then try again.")),
+            Needs::TwoDocuments if documents < 2 => {
+                Some(t("Open a document and attach a second file (or attach two files) first, then try again."))
+            }
+            _ => None,
+        };
+        if let Some(m) = missing {
+            self.notify(NoticeKind::Info, m);
+            return Vec::new();
+        }
+        if !self.settings.ai_panel_open {
+            self.settings.ai_panel_open = true;
+            self.save_settings();
+        }
+        self.send_chat(prompt, Some(shown))
+    }
+
+    /// How many documents would be sent (without reading them).
+    fn chat_context_count(&self) -> usize {
+        let tab = usize::from(self.chat_use_document && self.active_tab.and_then(|i| self.tabs.get(i)).is_some());
+        let open_tab_is_attached =
+            self.chat_use_document && self.active_tab.and_then(|i| self.tabs.get(i)).is_some_and(|t| self.chat_files.contains(&t.path));
+        tab + self.chat_files.len() - usize::from(open_tab_is_attached)
+    }
+
+    fn send_chat(&mut self, text: &str, shown: Option<String>) -> Vec<Effect> {
+        let text = text.trim();
+        if text.is_empty() {
+            return Vec::new();
+        }
+        if self.chat_busy.is_some() {
+            self.notify(NoticeKind::Info, t("Wait for the answer first."));
+            return Vec::new();
+        }
+        if !self.settings.ai_enabled {
+            self.notify(NoticeKind::Info, t("AI is switched off in Settings."));
+            return Vec::new();
+        }
+        if self.chat_request_parts().is_err() {
+            return Vec::new();
+        }
+        let now = unix_now();
+        let id = match self.chat_current.clone().filter(|id| self.chats.iter().any(|c| c.id == *id)) {
+            Some(id) => id,
+            None => {
+                let id = format!("c{}", now * 1000 + self.chats.len() as u64);
+                self.chats.insert(0, crate::chat::Chat::new(id.clone(), shown.as_deref().unwrap_or(text), now));
+                self.chat_current = Some(id.clone());
+                id
+            }
+        };
+        if let Some(chat) = self.chats.iter_mut().find(|c| c.id == id) {
+            chat.messages.push(crate::chat::Message { role: crate::chat::Role::User, text: text.to_string(), shown });
+            chat.updated = now;
+            let extra = chat.messages.len().saturating_sub(crate::chat::MAX_MESSAGES);
+            chat.messages.drain(..extra);
+        }
+        // the newest conversation first
+        self.chats.sort_by_key(|c| std::cmp::Reverse(c.updated));
+        self.save_chats();
+        self.ask_model(&id)
+    }
+
+    fn retry_chat(&mut self) -> Vec<Effect> {
+        let Some(id) = self.chat_current.clone() else { return Vec::new() };
+        if self.chat_busy.is_some()
+            || !self.chats.iter().any(|c| c.id == id && c.messages.last().is_some_and(|m| m.role == crate::chat::Role::User))
+        {
+            return Vec::new();
+        }
+        self.ask_model(&id)
+    }
+
+    /// The model, address and key of the chat, or says why there are none.
+    fn chat_request_parts(&mut self) -> Result<(ModelProfile, Protocol, String, crate::models_api::ModelsApi), ()> {
+        let Some(profile) = self.settings.model_for("chat").cloned() else {
+            self.notify(NoticeKind::Info, t("Connect an AI model first (Settings › AI Models)."));
+            self.section = SettingsSection::AiModels;
+            self.page = Page::Settings;
+            return Err(());
+        };
+        let key = self.secret(&provider_key_name(&profile.provider)).unwrap_or_default();
+        let needs_key = providers::get(&profile.provider).is_none_or(|p| p.needs_key);
+        if needs_key && key.is_empty() {
+            self.notify(
+                NoticeKind::Error,
+                tr(
+                    "There is no API key for {provider}. Add it in Settings › AI Models.",
+                    &[("provider", &self.provider_name(&profile.provider))],
+                ),
+            );
+            return Err(());
+        }
+        let protocol = self.chat_protocol(&profile.provider);
+        let Some(api) = self.models_api_of(&profile.provider) else {
+            self.notify(NoticeKind::Error, t("This model cannot chat. Choose a chat model in Settings › AI Models."));
+            return Err(());
+        };
+        Ok((profile, protocol, key, api))
+    }
+
+    /// Send the conversation `id` (ending with a message of yours) to the model.
+    fn ask_model(&mut self, id: &str) -> Vec<Effect> {
+        self.chat_error = None;
+        let Ok((profile, protocol, key, api)) = self.chat_request_parts() else { return Vec::new() };
+        let documents = self.chat_context();
+        let language =
+            crate::i18n::LANGUAGES.iter().find(|(tag, _)| *tag == self.settings.language).map(|(_, name)| *name).unwrap_or("English");
+        let system = crate::chat::system_prompt(language, &documents);
+        let Some(chat) = self.chats.iter().find(|c| c.id == id) else { return Vec::new() };
+        match crate::chat::request(protocol, &api, &profile.base_url, &key, &profile.model, &system, &chat.messages) {
+            Ok(request) => {
+                self.chat_busy = Some(id.to_string());
+                self.chat_sent_to = protocol;
+                vec![Effect::Chat { chat: id.to_string(), request }]
+            }
+            Err(e) => {
+                self.chat_error = Some(e);
+                Vec::new()
+            }
+        }
+    }
+
+    fn chat_replied(&mut self, id: &str, result: Result<String, String>) {
+        if self.chat_busy.as_deref() == Some(id) {
+            self.chat_busy = None;
+        }
+        let parsed = result.map_err(|e| crate::chat::explain(&e)).and_then(|body| crate::chat::parse_reply(self.chat_sent_to, &body));
+        let Some(chat) = self.chats.iter_mut().find(|c| c.id == id) else { return };
+        match parsed {
+            Ok(text) => {
+                chat.messages.push(crate::chat::Message { role: crate::chat::Role::Assistant, text, shown: None });
+                chat.updated = unix_now();
+                self.chat_error = None;
+                self.save_chats();
+            }
+            Err(e) => self.chat_error = Some(e),
         }
     }
 
@@ -1935,5 +2319,138 @@ mod tests {
         let [Effect::FetchModels { request, .. }] = effects.as_slice() else { panic!("{effects:?}") };
         assert_eq!(request.url, "https://res.openai.azure.com/openai/v1/models");
         assert_eq!(request.headers[0], ("api-key".to_string(), "k".to_string()));
+    }
+
+    const OPENAI_ANSWER: &str = r#"{"choices":[{"message":{"role":"assistant","content":"Here is the summary."}}]}"#;
+
+    fn connect_openai(f: &mut Fixture) {
+        fill_form(&mut f.m, "openai", "gpt-5");
+        f.m.submit_add_model();
+        f.m.settings.ai_enabled = true;
+    }
+
+    #[test]
+    fn a_message_goes_to_the_model_with_the_document_and_the_answer_is_kept() {
+        let mut f = fixture();
+        // no model yet: the chat sends you to Settings instead of sending nothing
+        assert!(f.m.dispatch(Command::SendChat("Hi".into())).is_empty());
+        assert!(f.m.chats.is_empty());
+        connect_openai(&mut f);
+        f.m.dispatch(Command::NewDocument(Kind::Document));
+        f.m.tabs[0].content = "# Plan\nBuy milk.".into();
+        let effects = f.m.dispatch(Command::SendChat("  What is in my document?  ".into()));
+        let [Effect::Chat { chat, request }] = effects.as_slice() else { panic!("{effects:?}") };
+        assert_eq!(request.url, "https://api.openai.com/v1/chat/completions");
+        let body = request.body.as_deref().unwrap_or_default();
+        assert!(body.contains("Buy milk.") && body.contains("What is in my document?") && body.contains("\"gpt-5\""), "{body}");
+        assert!(!body.contains("sk-test"), "the key is a header, never in the text");
+        assert_eq!(f.m.chat_busy.as_deref(), Some(chat.as_str()));
+        // one question at a time
+        assert!(f.m.dispatch(Command::SendChat("again".into())).is_empty());
+        f.m.dispatch(Command::ChatReplied { chat: chat.clone(), result: Ok(OPENAI_ANSWER.into()) });
+        assert!(f.m.chat_busy.is_none() && f.m.chat_error.is_none());
+        let c = &f.m.chats[0];
+        assert_eq!(
+            (c.messages.len(), c.messages[1].text.as_str(), c.title.as_str()),
+            (2, "Here is the summary.", "What is in my document?")
+        );
+        // a follow-up goes into the same conversation, with the earlier messages
+        let effects = f.m.dispatch(Command::SendChat("Shorter".into()));
+        let [Effect::Chat { request, .. }] = effects.as_slice() else { panic!("{effects:?}") };
+        assert!(request.body.as_deref().unwrap_or_default().contains("Here is the summary."));
+        assert_eq!(f.m.chats.len(), 1);
+        // the conversation survives a restart
+        f.m.dispatch(Command::ChatReplied { chat: chat.clone(), result: Ok(OPENAI_ANSWER.into()) });
+        let again = AppModel::new(Store::at(f.m.store.dir().to_path_buf()));
+        assert_eq!((again.chats.len(), again.chats[0].messages.len()), (1, 4));
+    }
+
+    #[test]
+    fn failures_show_under_the_chat_and_try_again_sends_the_same_message() {
+        let mut f = fixture();
+        connect_openai(&mut f);
+        let effects = f.m.dispatch(Command::SendChat("Hello".into()));
+        let [Effect::Chat { chat, .. }] = effects.as_slice() else { panic!("{effects:?}") };
+        f.m.dispatch(Command::ChatReplied {
+            chat: chat.clone(),
+            result: Err(r#"status code 401: {"error":{"message":"Incorrect API key"}}"#.into()),
+        });
+        assert!(f.m.chat_error.as_deref().is_some_and(|e| e.contains("API key")));
+        assert_eq!(f.m.chats[0].messages.len(), 1, "your message stays");
+        let effects = f.m.dispatch(Command::RetryChat);
+        assert!(matches!(effects.as_slice(), [Effect::Chat { .. }]) && f.m.chat_error.is_none());
+        f.m.dispatch(Command::ChatReplied { chat: chat.clone(), result: Ok("<html>".into()) });
+        assert!(f.m.chat_error.is_some(), "an answer that is not understood is an error too");
+        // a model that cannot chat is refused before anything is sent
+        f.m.dispatch(Command::ChatReplied { chat: chat.clone(), result: Ok(OPENAI_ANSWER.into()) });
+        assert_eq!(f.m.chats[0].messages.len(), 2);
+    }
+
+    #[test]
+    fn chips_and_tools_need_a_document_and_history_can_be_managed() {
+        let mut f = fixture();
+        connect_openai(&mut f);
+        // "Summarize document" without a document says so and sends nothing
+        assert!(f.m.dispatch(Command::ChatChip(0)).is_empty());
+        assert!(f.m.notice.as_ref().is_some_and(|n| n.text.contains("document")) && f.m.chats.is_empty());
+        // "Brainstorm ideas" needs none
+        assert!(matches!(f.m.dispatch(Command::ChatChip(6)).as_slice(), [Effect::Chat { .. }]));
+        let first = f.m.chats[0].id.clone();
+        assert_eq!(f.m.chats[0].messages[0].shown.as_deref(), Some("Brainstorm ideas"));
+        f.m.dispatch(Command::ChatReplied { chat: first.clone(), result: Ok(OPENAI_ANSWER.into()) });
+        // a tool on an open document; comparing needs two
+        f.m.dispatch(Command::NewChat);
+        f.m.dispatch(Command::NewDocument(Kind::Document));
+        assert!(matches!(f.m.dispatch(Command::RunChatTool("Check Before Publishing".into())).as_slice(), [Effect::Chat { .. }]));
+        assert_eq!(f.m.chats.len(), 2);
+        let second = f.m.chat_current.clone().unwrap_or_default();
+        f.m.dispatch(Command::ChatReplied { chat: second.clone(), result: Ok(OPENAI_ANSWER.into()) });
+        f.m.dispatch(Command::NewChat);
+        assert!(f.m.dispatch(Command::RunChatTool("Compare Documents".into())).is_empty());
+        assert!(f.m.dispatch(Command::RunChatTool("Convert to Book".into())).is_empty());
+        // history: open an old chat, delete one, delete all
+        f.m.dispatch(Command::OpenChat(first.clone()));
+        assert_eq!(f.m.chat_current.as_deref(), Some(first.as_str()));
+        f.m.dispatch(Command::DeleteChat(first.clone()));
+        assert!(f.m.chat_current.is_none() && f.m.chats.len() == 1);
+        f.m.dispatch(Command::ClearChats);
+        assert!(f.m.chats.is_empty());
+        let again = AppModel::new(Store::at(f.m.store.dir().to_path_buf()));
+        assert!(again.chats.is_empty());
+    }
+
+    #[test]
+    fn attached_files_are_sent_as_text_and_binary_files_are_reported() {
+        let mut f = fixture();
+        connect_openai(&mut f);
+        let dir = f.m.settings.documents_dir.clone();
+        let (text, bin) = (dir.join("notes.md"), dir.join("pic.png"));
+        std::fs::write(&text, "Secret plan: tea.").unwrap();
+        std::fs::write(&bin, [0xff_u8, 0xfe, 0x00, 0x80]).unwrap();
+        f.m.dispatch(Command::AttachToChat(text.clone()));
+        f.m.dispatch(Command::AttachToChat(bin.clone()));
+        let effects = f.m.dispatch(Command::SendChat("Read them".into()));
+        let [Effect::Chat { request, .. }] = effects.as_slice() else { panic!("{effects:?}") };
+        let body = request.body.as_deref().unwrap_or_default();
+        assert!(body.contains("Secret plan: tea.") && body.contains("notes.md") && !body.contains("pic.png"));
+        assert!(f.m.notice.as_ref().is_some_and(|n| n.text.contains("pic.png")));
+        // the chat asks for a file with a dialog that starts in your documents
+        assert_eq!(f.m.dispatch(Command::ChooseChatFile), vec![Effect::ChooseChatFile { start: dir }]);
+        // the current document can be switched off
+        f.m.dispatch(Command::ToggleChatDocument);
+        assert!(!f.m.chat_use_document);
+    }
+
+    #[test]
+    fn help_opens_at_a_topic_and_closes_the_ai_panel_like_settings() {
+        let mut f = fixture();
+        f.m.dispatch(Command::OpenHelp(HelpTopic::AiModels));
+        assert_eq!((f.m.page, f.m.help), (Page::Help, HelpTopic::AiModels));
+        assert!(!f.m.ai_panel_visible());
+        f.m.dispatch(Command::ShowPage(Page::Home));
+        assert!(f.m.ai_panel_visible());
+        assert_eq!(HelpTopic::ALL.len(), 14);
+        assert_eq!((HelpTopic::Glyphra.depth(), HelpTopic::Settings.depth(), HelpTopic::Region.depth()), (0, 1, 2));
+        assert_eq!(crate::menu::command_for_menu_id("help.manual"), Some(Command::OpenHelp(HelpTopic::Glyphra)));
     }
 }

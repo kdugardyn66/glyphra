@@ -3,7 +3,7 @@
 Markdown documents and presentations in one workspace, with AI and team
 collaboration. Rust and Dioxus; macOS, Linux and Windows.
 
-**Version 0.1.2** — the start screen and the left menu bar:
+**Version 0.1.3** — the start screen and the left menu bar:
 
 - **Home**: Create new (Document, Presentation) and your recent files
 - **Open**: recent folders and Browse
@@ -11,7 +11,7 @@ collaboration. Rust and Dioxus; macOS, Linux and Windows.
 - **Settings › AI Models**: 19 providers by region (Europe, Asia-Pacific, North America, local) with 55 models, ported from Glyphra; custom providers pick an API and region
 - **AI Tools**: the catalogue of planned tools (they arrive in a later version)
 - **Collaboration**: placeholder for the server part
-- **AI Chat**: the right-hand panel, toggled from the menu bar (conversation arrives in 0.3.0)
+- **AI Chat**: the right-hand panel, toggled from the menu bar. Ask the model you connected; the prompt buttons, History, attachments and the AI Tools run in it
 - **Settings**: General (applied with *Apply*; Appearance (System, Light or Dark), a light theme (Modern Light, Solarized Light, Light+) and a dark theme (Modern Dark, Solarized Dark, Dark+); default System with Modern Light and Modern Dark), AI Models (providers, API keys encrypted (AES-256-GCM) inside the settings file), Model Assignment, MCP Servers (validated JSON editor)
 
 Opening a document shows a read-only preview in a tab; the editor arrives in 0.2.0. See
@@ -30,7 +30,7 @@ folder (`GLYPHRA_CONFIG_DIR` overrides it); new documents go to `~/Documents/Gly
 ## Build packages
 
 ```
-./build.sh                 # on macOS: Glyphra.app and Glyphra-0.1.2-macos-<arch>.dmg in dist/
+./build.sh                 # on macOS: Glyphra.app and Glyphra-0.1.3-macos-<arch>.dmg in dist/
 ./build.sh --universal     # Apple silicon + Intel in one binary
 ./build.sh --no-dmg        # the .app only
 ./build.sh --run           # build and open the app
@@ -112,3 +112,16 @@ Rendering lives in `crates/gl-core/src/region.rs` (`region::pattern`, `number`, 
 set `GLYPHRA_REGION_EXPECTED` to run the test that compares all countries with the workbook's example strings.
 
 A model of a connected provider can be changed or moved to another provider with "Edit" in the model's menu.
+
+## Help
+
+**Help** (the button above Settings in the left menu bar, **Help › Glyphra Help**, or **F1**) opens the manual: topics at the left like the sections of Settings, and for each topic a full description with screenshots. The text is in `crates/gl-ui/src/help.rs`; the screenshots are in `crates/gl-ui/assets/help/` and are compiled into the program, so Help works offline. When a page changes, retake its screenshot (1280×820 window, light theme, the sample data in `docs/`-style fixtures) and keep the file name. The manual is English only; the topic names and menu items are translated.
+
+## AI Chat
+
+Messages go to the chat model chosen in the panel, over the provider's own API: OpenAI-style chat completions (OpenAI, Ollama and the other compatible providers), Anthropic Messages and Google Gemini. DeepL and BFL cannot chat. The request code is in `crates/gl-core/src/chat.rs`.
+
+- **What is sent**: your message, the earlier messages of that conversation (the last 30) and, as context, the document you are looking at plus any files you attached with **+**. Switch the document off with the ✕ on its pill. Nothing else leaves your computer, and only when you send.
+- **Prompt buttons and AI Tools** are ready-made prompts: they need an open document or an attached file (Compare Documents needs two) and say so when missing. *Convert to Book* arrives later.
+- **History** is kept in `chats.json` in the config folder (50 chats, 200 messages each); delete one chat or all of them from the History menu.
+- Answers arrive as a whole (no streaming); a long answer can take up to three minutes before a timeout is reported, with **Try again**.

@@ -2,9 +2,10 @@
 //! on the right and the notice bar.
 
 use crate::icons::{Icon, Logo};
-use crate::{ai_panel, ai_tools, collaboration, doc, home, open, settings, templates};
+use crate::{ai_panel, ai_tools, collaboration, doc, help, home, open, settings, templates};
+use dioxus::core::spawn_forever;
 use dioxus::prelude::*;
-use gl_core::{AppModel, Command, Effect, NoticeKind, Page, SettingsSection, command_for_menu_id, t};
+use gl_core::{AppModel, Command, Effect, HelpTopic, NoticeKind, Page, SettingsSection, command_for_menu_id, t};
 use gl_store::Store;
 use std::time::Duration;
 
@@ -21,8 +22,9 @@ fn exec(mut model: Signal<AppModel>, effect: Effect) {
         Effect::Quit => dioxus::desktop::window().close(),
         Effect::FetchModels { provider, request } => {
             // not tied to the component that asked: forms are rebuilt while the answer is on its way
-            dioxus::core::spawn_forever(async move {
-                let result = tokio::task::spawn_blocking(move || fetch_text(&request)).await.unwrap_or_else(|e| Err(e.to_string()));
+            spawn_forever(async move {
+                let result =
+                    tokio::task::spawn_blocking(move || fetch_text(&request, MODELS_TIMEOUT)).await.unwrap_or_else(|e| Err(e.to_string()));
                 run(model, Command::ModelsFetched { provider, result });
             });
         }
@@ -33,6 +35,23 @@ fn exec(mut model: Signal<AppModel>, effect: Effect) {
                     gl_core::tr("Could not open the file manager: {error}", &[("error", &e.to_string())]),
                 );
             }
+        }
+        Effect::Chat { chat, request } => {
+            spawn_forever(async move {
+                let result =
+                    tokio::task::spawn_blocking(move || fetch_text(&request, CHAT_TIMEOUT)).await.unwrap_or_else(|e| Err(e.to_string()));
+                run(model, Command::ChatReplied { chat, result });
+            });
+        }
+        Effect::ChooseChatFile { start } => {
+            spawn_forever(async move {
+                let dialog = rfd::AsyncFileDialog::new().set_directory(&start).add_filter(t("Text files"), &gl_core::OPENABLE);
+                if let Some(files) = dialog.pick_files().await {
+                    for f in files {
+                        run(model, Command::AttachToChat(f.path().to_path_buf()));
+                    }
+                }
+            });
         }
         Effect::OpenFileDialog { start } => {
             spawn(async move {
@@ -77,19 +96,33 @@ fn reveal(path: &std::path::Path) -> std::io::Result<()> {
 
 /// The most that is read from a provider's answer.
 const MAX_ANSWER: u64 = 2 * 1024 * 1024;
+const MODELS_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(20);
+/// A model may take a while to write a long answer.
+const CHAT_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(180);
+/// The most kept of an error answer, to explain it.
+const MAX_ERROR: u64 = 2000;
 
-/// Ask a provider for its models: one GET, never redirected (a redirect could carry the API key
-/// to another server), at most `MAX_ANSWER` bytes read.
-fn fetch_text(request: &gl_core::models_api::Request) -> Result<String, String> {
+/// Send a request to a provider: a GET, or a POST with its JSON body. Never redirected (a
+/// redirect could carry the API key to another server); at most `MAX_ANSWER` bytes are read.
+fn fetch_text(request: &gl_core::models_api::Request, timeout: std::time::Duration) -> Result<String, String> {
     use std::io::Read;
-    let agent = ureq::AgentBuilder::new().timeout(std::time::Duration::from_secs(20)).redirects(0).build();
-    let mut call = agent.get(&request.url);
+    let agent = ureq::AgentBuilder::new().timeout(timeout).redirects(0).build();
+    let mut call = if request.body.is_some() { agent.post(&request.url) } else { agent.get(&request.url) };
     for (name, value) in &request.headers {
         call = call.set(name, value);
     }
     // the address (which may hold the key as a query) is not part of the error
-    let resp = call.call().map_err(|e| match e {
-        ureq::Error::Status(code, _) => format!("status code {code}"),
+    let sent = match &request.body {
+        Some(body) => call.send_string(body),
+        None => call.call(),
+    };
+    let resp = sent.map_err(|e| match e {
+        ureq::Error::Status(code, resp) => {
+            // the provider's own explanation, if it gave one
+            let mut detail = String::new();
+            let _ = resp.into_reader().take(MAX_ERROR).read_to_string(&mut detail);
+            format!("status code {code}: {detail}")
+        }
         ureq::Error::Transport(t) => t.kind().to_string(),
     })?;
     let mut text = String::new();
@@ -136,6 +169,7 @@ pub fn Root() -> Element {
                             Page::Collaboration => rsx! { collaboration::CollaborationPage {} },
                             Page::AiTools => rsx! { ai_tools::AiToolsPage {} },
                             Page::Settings => rsx! { settings::SettingsPage {} },
+                            Page::Help => rsx! { help::HelpPage {} },
                         }
                     }
                 }
@@ -235,6 +269,10 @@ fn Rail() -> Element {
                 span { {t("AI Tools")} }
             }
             div { class: "rail-grow" }
+            button { class: on(Page::Help), onclick: move |_| run(model, Command::OpenHelp(HelpTopic::Glyphra)),
+                Icon { name: "help", size: 26 }
+                span { {t("Help")} }
+            }
             button { class: on(Page::Settings), onclick: move |_| run(model, Command::OpenSettings(SettingsSection::General)),
                 Icon { name: "settings", size: 26 }
                 span { {t("Settings")} }

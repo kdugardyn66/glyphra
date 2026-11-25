@@ -64,11 +64,12 @@ pub struct ModelsApi {
     pub format: Format,
 }
 
-/// A request for the shell to send: GET `url` with `headers`.
+/// A request for the shell to send: GET `url` with `headers`, or POST them with `body` (JSON).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Request {
     pub url: String,
     pub headers: Vec<(String, String)>,
+    pub body: Option<String>,
 }
 
 /// A model a provider says it has.
@@ -101,7 +102,7 @@ fn address_ok(url: &str) -> bool {
             .any(|p| url.strip_prefix(p).is_some_and(|r| r.is_empty() || r.starts_with([':', '/'])))
 }
 
-fn percent_encode(s: &str) -> String {
+pub(crate) fn percent_encode(s: &str) -> String {
     let mut out = String::new();
     for b in s.bytes() {
         if b.is_ascii_alphanumeric() || matches!(b, b'-' | b'_' | b'.' | b'~') {
@@ -167,7 +168,7 @@ impl ModelsApi {
             }
         }
         headers.extend(self.headers.iter().cloned());
-        Ok(Request { url, headers })
+        Ok(Request { url, headers, body: None })
     }
 }
 

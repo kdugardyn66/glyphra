@@ -1,8 +1,9 @@
-//! AI Tools: the catalogue of tools per kind of file. They arrive in a later version; the
-//! page shows what is planned and says so when one is clicked.
+//! AI Tools: the catalogue of tools per kind of file. A tool runs as a prompt in AI Chat on the
+//! document you are looking at; the ones that need more (an e-book file) arrive later.
 
+use crate::shell::run;
 use dioxus::prelude::*;
-use gl_core::{AppModel, NoticeKind, t, tr, tx};
+use gl_core::{AppModel, Command, NoticeKind, chat, t, tr, tx};
 
 /// One group of tools on the page.
 pub struct Section {
@@ -66,7 +67,13 @@ pub fn AiToolsPage() -> Element {
                             button {
                                 key: "{title}",
                                 class: "tool",
-                                onclick: move |_| model.write().notify(NoticeKind::Info, tr("“{title}” arrives in a later version of Glyphra.", &[("title", &t(title))])),
+                                onclick: move |_| {
+                                    if chat::tool(title).is_some() {
+                                        run(model, Command::RunChatTool(title.to_string()));
+                                    } else {
+                                        model.write().notify(NoticeKind::Info, tr("“{title}” arrives in a later version of Glyphra.", &[("title", &t(title))]));
+                                    }
+                                },
                                 span { class: "tool-ico {sec.accent}", "{sec.letter}" }
                                 span { class: "tool-tx",
                                     span { class: "tool-title", {t(title)} }

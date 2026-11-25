@@ -5,6 +5,7 @@ mod ai_panel;
 mod ai_tools;
 mod collaboration;
 mod doc;
+mod help;
 mod home;
 mod icons;
 mod open;

@@ -40,6 +40,10 @@ fn paths(name: &str) -> &'static str {
             r#"<path d="M3 3l18 18"/><path d="M10.2 5.7A9 9 0 0 1 12 5.5c6 0 9.5 6.5 9.5 6.5a16 16 0 0 1-3 3.8M6.3 7.6A15.5 15.5 0 0 0 2.5 12S6 18.5 12 18.5a8.7 8.7 0 0 0 3.3-.7"/><path d="M9.9 10a2.8 2.8 0 0 0 4 4"/>"#
         }
         "history" => r#"<path d="M4 12a8 8 0 1 0 2.5-5.8"/><path d="M4 4v4.5h4.5M12 8v4.5l3 1.8"/>"#,
+        "copy" => {
+            r#"<rect x="8.5" y="8.5" width="11" height="11" rx="2"/><path d="M15.5 8.5V6.5a2 2 0 0 0-2-2h-7a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h2"/>"#
+        }
+        "refresh" => r#"<path d="M19.5 12a7.5 7.5 0 1 1-2.3-5.4"/><path d="M19.5 4.5v4h-4"/>"#,
         "sliders" => {
             r#"<path d="M4 7h9M17 7h3M4 12h3M11 12h9M4 17h11M19 17h1"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="17" cy="17" r="2"/>"#
         }
@@ -48,6 +52,7 @@ fn paths(name: &str) -> &'static str {
         "terminal" => r#"<rect x="3.5" y="5" width="17" height="14" rx="2.5"/><path d="m7.5 10 3 2-3 2M12.5 15h4"/>"#,
         "trash" => r#"<path d="M5 7h14M9.5 7V5h5v2M7 7l.8 12h8.4L17 7"/>"#,
         "star" => r#"<path d="m12 3.5 2.6 5.5 6 .8-4.4 4.2 1.1 6-5.3-2.9-5.3 2.9 1.1-6L3.4 9.8l6-.8z"/>"#,
+        "help" => r#"<circle cx="12" cy="12" r="8.5"/><path d="M9.7 9.6a2.4 2.4 0 1 1 3.5 2.1c-.8.5-1.2 1-1.2 1.8M12 16.4h.01"/>"#,
         "info" => r#"<circle cx="12" cy="12" r="8.5"/><path d="M12 11v5M12 8h.01"/>"#,
         _ => "",
     }

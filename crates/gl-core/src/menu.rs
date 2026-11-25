@@ -2,7 +2,7 @@
 //! every item is a command, ids are unique and shortcuts are not used twice.
 
 use crate::i18n::tx;
-use crate::model::{Command, Page, SettingsSection};
+use crate::model::{Command, HelpTopic, Page, SettingsSection};
 use gl_templates::Kind;
 
 /// Items the operating system implements itself (edit commands must stay native on macOS).
@@ -113,6 +113,10 @@ pub fn menu_bar(mac: bool) -> Vec<Menu> {
             Entry::Separator,
             Entry::Native(Native::BringAllToFront),
         ],
+    });
+    bar.push(Menu {
+        label: tx("Help"),
+        entries: vec![item("help.manual", tx("Glyphra Help"), Some("F1"), Command::OpenHelp(HelpTopic::Glyphra))],
     });
     bar
 }

@@ -5,6 +5,7 @@
 #![deny(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
 
+pub mod chat;
 pub mod i18n;
 pub mod menu;
 pub mod model;
@@ -16,6 +17,6 @@ pub mod region;
 pub use i18n::{LANGUAGES, t, tr, tx};
 pub use menu::{command_for_menu_id, menu_bar};
 pub use model::{
-    AddModelForm, AppModel, Command, CustomProviderForm, Effect, GeneralDraft, McpEditor, ModelChoice, Notice, NoticeKind, OPENABLE, Page,
-    Row, SettingsSection, Step, TEMPLATES_PER_PAGE, Tab, TemplateView, TemplatesState, init_language,
+    AddModelForm, AppModel, Command, CustomProviderForm, Effect, GeneralDraft, HelpTopic, McpEditor, ModelChoice, Notice, NoticeKind,
+    OPENABLE, Page, Row, SettingsSection, Step, TEMPLATES_PER_PAGE, Tab, TemplateView, TemplatesState, init_language,
 };
